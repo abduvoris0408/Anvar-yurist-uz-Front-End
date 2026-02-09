@@ -1,0 +1,201 @@
+import { useState, useMemo } from 'react'
+import { Table, Form, Input, DatePicker, Switch, Tag, message, Space } from 'antd'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { educationApi } from '../api'
+import { PageHeader, CrudDrawer, ActionButtons } from '../components'
+import type { Education } from '../types'
+import type { ColumnsType } from 'antd/es/table'
+import dayjs from 'dayjs'
+
+const { TextArea } = Input
+
+const EducationPage = () => {
+    const [isDrawerOpen, setIsDrawerOpen] = useState(false)
+    const [editingEducation, setEditingEducation] = useState<Education | null>(null)
+    const [searchText, setSearchText] = useState('')
+    const [form] = Form.useForm()
+    const queryClient = useQueryClient()
+
+    const { data: educationData, isLoading } = useQuery({
+        queryKey: ['education'],
+        queryFn: () => educationApi.getAll({ limit: 100 }),
+    })
+
+    const filteredData = useMemo(() => {
+        if (!searchText) return educationData?.data || []
+        return (educationData?.data || []).filter((item) =>
+            item.school.toLowerCase().includes(searchText.toLowerCase()) ||
+            item.degree?.toLowerCase().includes(searchText.toLowerCase()) ||
+            item.fieldOfStudy?.toLowerCase().includes(searchText.toLowerCase())
+        )
+    }, [educationData?.data, searchText])
+
+    const createMutation = useMutation({
+        mutationFn: (data: Partial<Education>) => educationApi.create(data),
+        onSuccess: () => {
+            message.success("Ta'lim yaratildi!")
+            queryClient.invalidateQueries({ queryKey: ['education'] })
+            handleCloseDrawer()
+        },
+        onError: () => message.error('Xatolik yuz berdi'),
+    })
+
+    const updateMutation = useMutation({
+        mutationFn: ({ id, data }: { id: string; data: Partial<Education> }) => educationApi.update(id, data),
+        onSuccess: () => {
+            message.success("Ta'lim yangilandi!")
+            queryClient.invalidateQueries({ queryKey: ['education'] })
+            handleCloseDrawer()
+        },
+        onError: () => message.error('Xatolik yuz berdi'),
+    })
+
+    const deleteMutation = useMutation({
+        mutationFn: (id: string) => educationApi.delete(id),
+        onSuccess: () => {
+            message.success("Ta'lim o'chirildi!")
+            queryClient.invalidateQueries({ queryKey: ['education'] })
+        },
+        onError: () => message.error('Xatolik yuz berdi'),
+    })
+
+    const handleOpenDrawer = (education?: Education) => {
+        if (education) {
+            setEditingEducation(education)
+            form.setFieldsValue({
+                ...education,
+                startDate: education.startDate ? dayjs(education.startDate) : null,
+                endDate: education.endDate ? dayjs(education.endDate) : null,
+            })
+        } else {
+            setEditingEducation(null)
+            form.resetFields()
+        }
+        setIsDrawerOpen(true)
+    }
+
+    const handleCloseDrawer = () => {
+        setIsDrawerOpen(false)
+        setEditingEducation(null)
+        form.resetFields()
+    }
+
+    const handleSubmit = async (values: Record<string, unknown>) => {
+        const data = {
+            ...values,
+            startDate: values.startDate ? (values.startDate as dayjs.Dayjs).toISOString() : undefined,
+            endDate: values.current ? null : (values.endDate ? (values.endDate as dayjs.Dayjs).toISOString() : undefined),
+        } as Partial<Education>
+
+        if (editingEducation) {
+            updateMutation.mutate({ id: editingEducation._id, data })
+        } else {
+            createMutation.mutate(data)
+        }
+    }
+
+    const columns: ColumnsType<Education> = [
+        {
+            title: "O'quv muassasasi",
+            dataIndex: 'school',
+            key: 'school',
+            sorter: (a, b) => a.school.localeCompare(b.school),
+            render: (text) => <strong>{text}</strong>
+        },
+        {
+            title: 'Daraja',
+            dataIndex: 'degree',
+            key: 'degree'
+        },
+        {
+            title: "Yo'nalish",
+            dataIndex: 'fieldOfStudy',
+            key: 'fieldOfStudy'
+        },
+        {
+            title: 'Davr',
+            key: 'period',
+            render: (_, record) => (
+                <span>
+                    {dayjs(record.startDate).format('YYYY')} - {record.current ? <Tag color="green">Hozir</Tag> : dayjs(record.endDate).format('YYYY')}
+                </span>
+            ),
+        },
+        {
+            title: 'Amallar',
+            key: 'actions',
+            width: 100,
+            render: (_, record) => (
+                <ActionButtons
+                    onEdit={() => handleOpenDrawer(record)}
+                    onDelete={() => deleteMutation.mutate(record._id)}
+                    deleteLoading={deleteMutation.isPending}
+                />
+            ),
+        },
+    ]
+
+    return (
+        <>
+            <PageHeader
+                title="Ta'lim"
+                onAdd={() => handleOpenDrawer()}
+                addButtonText="Yangi ta'lim"
+                onSearch={setSearchText}
+                searchPlaceholder="Ta'limni qidirish..."
+            >
+                <Table
+                    columns={columns}
+                    dataSource={filteredData}
+                    rowKey="_id"
+                    loading={isLoading}
+                    pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (total) => `Jami: ${total}` }}
+                    size="middle"
+                />
+            </PageHeader>
+
+            <CrudDrawer
+                open={isDrawerOpen}
+                onClose={handleCloseDrawer}
+                title={editingEducation ? "Ta'limni tahrirlash" : "Yangi ta'lim"}
+                loading={createMutation.isPending || updateMutation.isPending}
+                form={form}
+                onSubmit={handleSubmit}
+                isEdit={!!editingEducation}
+                width={450}
+            >
+                <Form.Item name="school" label="O'quv muassasasi" rules={[{ required: true }]}>
+                    <Input placeholder="TATU" />
+                </Form.Item>
+                <Form.Item name="degree" label="Daraja" rules={[{ required: true }]}>
+                    <Input placeholder="Bakalavr" />
+                </Form.Item>
+                <Form.Item name="fieldOfStudy" label="O'qish yo'nalishi" rules={[{ required: true }]}>
+                    <Input placeholder="Kompyuter fanlari" />
+                </Form.Item>
+                <Form.Item name="location" label="Joylashuv">
+                    <Input placeholder="Toshkent, O'zbekiston" />
+                </Form.Item>
+                <Form.Item name="description" label="Tavsif">
+                    <TextArea rows={3} placeholder="Ta'lim haqida" />
+                </Form.Item>
+                <Space className="w-full" size="middle">
+                    <Form.Item name="startDate" label="Boshlanish" rules={[{ required: true }]}>
+                        <DatePicker picker="year" />
+                    </Form.Item>
+                    <Form.Item name="endDate" label="Tugash">
+                        <DatePicker picker="year" />
+                    </Form.Item>
+                </Space>
+                <Form.Item name="current" label="Hozirda o'qiyapman" valuePropName="checked">
+                    <Switch />
+                </Form.Item>
+                <Form.Item name="grade" label="Baho / GPA">
+                    <Input placeholder="4.5 GPA" />
+                </Form.Item>
+            </CrudDrawer>
+        </>
+    )
+}
+
+export default EducationPage
