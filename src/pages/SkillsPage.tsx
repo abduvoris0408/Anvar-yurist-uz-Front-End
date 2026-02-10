@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
-import { Table, Form, Input, Select, Slider, Tag, message } from 'antd'
+import { Table, Form, Input, Select, Slider, Tag, message, InputNumber } from 'antd'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { skillsApi } from '../api'
+import { skillsApi, categoriesApi } from '../api'
 import { PageHeader, CrudDrawer, ActionButtons } from '../components'
 import type { Skill } from '../types'
 import type { ColumnsType } from 'antd/es/table'
@@ -18,11 +18,16 @@ const SkillsPage = () => {
         queryFn: () => skillsApi.getAll({ limit: 100 }),
     })
 
+    const { data: categoriesData } = useQuery({
+        queryKey: ['categories'],
+        queryFn: () => categoriesApi.getAll(),
+    })
+
     const filteredData = useMemo(() => {
         if (!searchText) return skillsData?.data || []
         return (skillsData?.data || []).filter((item) =>
             item.name.toLowerCase().includes(searchText.toLowerCase()) ||
-            item.category?.toLowerCase().includes(searchText.toLowerCase())
+            (typeof item.category === 'string' ? item.category : item.category?.name || '')?.toLowerCase().includes(searchText.toLowerCase())
         )
     }, [skillsData?.data, searchText])
 
@@ -33,7 +38,11 @@ const SkillsPage = () => {
             queryClient.invalidateQueries({ queryKey: ['skills'] })
             handleCloseDrawer()
         },
-        onError: () => message.error('Xatolik yuz berdi'),
+        onError: (error: any) => {
+            console.error('Create Skill Error:', error)
+            const errMsg = error.response?.data?.error || error.response?.data?.message || error.message || 'Noma\'lum xatolik'
+            message.error(errMsg)
+        },
     })
 
     const updateMutation = useMutation({
@@ -43,7 +52,11 @@ const SkillsPage = () => {
             queryClient.invalidateQueries({ queryKey: ['skills'] })
             handleCloseDrawer()
         },
-        onError: () => message.error('Xatolik yuz berdi'),
+        onError: (error: any) => {
+            console.error('Update Skill Error:', error)
+            const errMsg = error.response?.data?.error || error.response?.data?.message || error.message || 'Noma\'lum xatolik'
+            message.error(errMsg)
+        },
     })
 
     const deleteMutation = useMutation({
@@ -58,7 +71,10 @@ const SkillsPage = () => {
     const handleOpenDrawer = (skill?: Skill) => {
         if (skill) {
             setEditingSkill(skill)
-            form.setFieldsValue(skill)
+            form.setFieldsValue({
+                ...skill,
+                categoryId: typeof skill.category === 'object' ? skill.category?.id : skill.categoryId,
+            })
         } else {
             setEditingSkill(null)
             form.resetFields()
@@ -72,11 +88,17 @@ const SkillsPage = () => {
         form.resetFields()
     }
 
-    const handleSubmit = async (values: Partial<Skill>) => {
+    const handleSubmit = async (values: any) => {
+        // Backend expects categoryId, not category
+        const data = {
+            ...values,
+            categoryId: values.categoryId,
+        }
+
         if (editingSkill) {
-            updateMutation.mutate({ id: editingSkill._id, data: values })
+            updateMutation.mutate({ id: editingSkill.id, data })
         } else {
-            createMutation.mutate(values)
+            createMutation.mutate(data)
         }
     }
 
@@ -87,14 +109,7 @@ const SkillsPage = () => {
         expert: 'gold',
     }
 
-    const categoryColors = {
-        frontend: 'cyan',
-        backend: 'purple',
-        database: 'orange',
-        devops: 'red',
-        design: 'pink',
-        other: 'default',
-    }
+
 
     const columns: ColumnsType<Skill> = [
         {
@@ -128,16 +143,25 @@ const SkillsPage = () => {
             title: 'Kategoriya',
             dataIndex: 'category',
             key: 'category',
-            filters: [
-                { text: 'Frontend', value: 'frontend' },
-                { text: 'Backend', value: 'backend' },
-                { text: 'Database', value: 'database' },
-                { text: 'DevOps', value: 'devops' },
-                { text: 'Design', value: 'design' },
-                { text: 'Boshqa', value: 'other' },
-            ],
-            onFilter: (value, record) => record.category === value,
-            render: (cat) => <Tag color={categoryColors[cat as keyof typeof categoryColors]}>{cat}</Tag>,
+            filters: categoriesData?.data?.map(cat => ({ text: cat.name, value: cat.name })),
+            onFilter: (value, record) => {
+                const catName = typeof record.category === 'object' && record.category ? record.category.name : record.category
+                return catName === value
+            },
+            render: (cat) => {
+                if (typeof cat === 'object' && cat) {
+                    return <Tag color={cat.color}>{cat.name}</Tag>
+                }
+                return cat ? <Tag>{cat}</Tag> : '-'
+            },
+        },
+        {
+            title: 'Icon',
+            dataIndex: 'icon',
+            key: 'icon',
+            render: (icon) => (
+                icon ? <img src={icon} alt="icon" style={{ width: 24, height: 24, objectFit: 'contain' }} /> : '-'
+            ),
         },
         {
             title: 'Tartib',
@@ -152,7 +176,7 @@ const SkillsPage = () => {
             render: (_, record) => (
                 <ActionButtons
                     onEdit={() => handleOpenDrawer(record)}
-                    onDelete={() => deleteMutation.mutate(record._id)}
+                    onDelete={() => deleteMutation.mutate(record.id)}
                     deleteLoading={deleteMutation.isPending}
                 />
             ),
@@ -171,7 +195,7 @@ const SkillsPage = () => {
                 <Table
                     columns={columns}
                     dataSource={filteredData}
-                    rowKey="_id"
+                    rowKey="id"
                     loading={isLoading}
                     pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (total) => `Jami: ${total}` }}
                     size="middle"
@@ -201,21 +225,23 @@ const SkillsPage = () => {
                 <Form.Item name="percentage" label="Foiz" initialValue={50}>
                     <Slider min={0} max={100} marks={{ 0: '0%', 50: '50%', 100: '100%' }} />
                 </Form.Item>
-                <Form.Item name="category" label="Kategoriya" rules={[{ required: true }]}>
+                <Form.Item name="categoryId" label="Kategoriya" rules={[{ required: true, message: 'Kategoriyani tanlang' }]}>
                     <Select placeholder="Tanlang">
-                        <Select.Option value="frontend">Frontend</Select.Option>
-                        <Select.Option value="backend">Backend</Select.Option>
-                        <Select.Option value="database">Database</Select.Option>
-                        <Select.Option value="devops">DevOps</Select.Option>
-                        <Select.Option value="design">Design</Select.Option>
-                        <Select.Option value="other">Boshqa</Select.Option>
+                        {categoriesData?.data?.map(cat => (
+                            <Select.Option key={cat.id} value={cat.id}>
+                                <div className="flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: cat.color }}></span>
+                                    {cat.name}
+                                </div>
+                            </Select.Option>
+                        ))}
                     </Select>
                 </Form.Item>
-                <Form.Item name="icon" label="Icon (URL)">
-                    <Input placeholder="https://example.com/icon.svg" />
+                <Form.Item name="icon" label="Icon (URL)" tooltip="SVG yoki PNG rasm havolasi">
+                    <Input placeholder="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/javascript/javascript-original.svg" />
                 </Form.Item>
                 <Form.Item name="order" label="Tartib" initialValue={0}>
-                    <Input type="number" />
+                    <InputNumber min={0} className="w-full" />
                 </Form.Item>
             </CrudDrawer>
         </>

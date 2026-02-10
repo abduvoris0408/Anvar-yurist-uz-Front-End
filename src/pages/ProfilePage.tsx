@@ -18,7 +18,11 @@ const ProfilePage = () => {
             message.success("Profil yangilandi!")
             updateUser(response.data)
         },
-        onError: () => message.error('Xatolik yuz berdi'),
+        onError: (error: any) => {
+            console.error('Update Profile Error:', error)
+            const errMsg = error.response?.data?.error || error.response?.data?.message || error.message || 'Noma\'lum xatolik'
+            message.error(errMsg)
+        },
     })
 
     const updatePasswordMutation = useMutation({
@@ -27,7 +31,11 @@ const ProfilePage = () => {
             message.success('Parol yangilandi!')
             passwordForm.resetFields()
         },
-        onError: () => message.error('Joriy parol noto\'g\'ri'),
+        onError: (error: any) => {
+            console.error('Update Password Error:', error)
+            const errMsg = error.response?.data?.error || error.response?.data?.message || error.message || 'Joriy parol noto\'g\'ri'
+            message.error(errMsg)
+        },
     })
 
     const handleUpdateDetails = (values: { name: string; email: string; bio?: string }) => {

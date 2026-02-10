@@ -8,7 +8,6 @@ import {
     ToolOutlined,
     ReadOutlined,
     TeamOutlined,
-    MailOutlined,
     UserOutlined,
     LogoutOutlined,
     MenuFoldOutlined,
@@ -18,12 +17,24 @@ import {
     MenuOutlined,
     SunOutlined,
     MoonOutlined,
-    AppstoreAddOutlined
+    AppstoreAddOutlined,
+    CustomerServiceOutlined,
+    TagsOutlined,
+    FileTextOutlined,
+    CommentOutlined,
+    NotificationOutlined,
+    InfoCircleOutlined,
+    StarOutlined,
+    QuestionCircleOutlined,
+    GlobalOutlined,
+    PhoneOutlined,
+    TrophyOutlined,
+    MailOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '../store/authStore'
 import { useThemeStore } from '../store/themeStore'
 import { useQuery } from '@tanstack/react-query'
-import { contactApi } from '../api'
+import { dashboardApi } from '../api'
 import { AppBreadcrumb } from '../components'
 
 const { Header, Sider, Content } = Layout
@@ -54,25 +65,60 @@ const MainLayout = () => {
         }
     }, [currentTheme])
 
-    const { data: contactStats } = useQuery({
-        queryKey: ['contact-stats'],
-        queryFn: () => contactApi.getStats(),
+    const { data: dashboardData } = useQuery({
+        queryKey: ['dashboard'],
+        queryFn: () => dashboardApi.getStats(),
     })
 
-    const unreadCount = contactStats?.data?.unread || 0
+    const unreadCount = dashboardData?.data?.alerts?.unreadContacts || 0
+    const pendingComments = dashboardData?.data?.alerts?.pendingComments || 0
 
     const menuItems = [
         { key: '/', icon: <DashboardOutlined />, label: 'Dashboard' },
-        { key: '/projects', icon: <ProjectOutlined />, label: 'Loyihalar' },
+        { key: '/about', icon: <InfoCircleOutlined />, label: 'Men haqimda' },
+        {
+            key: 'content',
+            icon: <FileTextOutlined />,
+            label: 'Kontent',
+            children: [
+                { key: '/projects', icon: <ProjectOutlined />, label: 'Loyihalar' },
+                { key: '/blog-posts', icon: <FileTextOutlined />, label: 'Blog Postlar' },
+                { key: '/news', icon: <NotificationOutlined />, label: 'Yangiliklar' },
+                { key: '/testimonials', icon: <StarOutlined />, label: 'Mijoz Fikrlari' },
+                { key: '/faqs', icon: <QuestionCircleOutlined />, label: 'FAQ' },
+            ],
+        },
         { key: '/skills', icon: <ToolOutlined />, label: "Ko'nikmalar" },
-        { key: '/categories', icon: <AppstoreOutlined />, label: 'Kategoriyalar' },
+        { key: '/services', icon: <CustomerServiceOutlined />, label: 'Xizmatlar' },
+        {
+            key: 'organize',
+            icon: <AppstoreOutlined />,
+            label: 'Tashkil etish',
+            children: [
+                { key: '/categories', icon: <AppstoreOutlined />, label: 'Kategoriyalar' },
+                { key: '/tags', icon: <TagsOutlined />, label: 'Teglar' },
+                { key: '/partners', icon: <GlobalOutlined />, label: 'Hamkorlar' },
+            ],
+        },
+        { key: '/achievements', icon: <TrophyOutlined />, label: 'Yutuqlar' },
+        {
+            key: '/blog-comments',
+            icon: <Badge count={pendingComments} size="small" offset={[8, 0]}><CommentOutlined /></Badge>,
+            label: 'Blog Izohlar',
+        },
         { key: '/experiences', icon: <TeamOutlined />, label: 'Tajriba' },
         { key: '/education', icon: <ReadOutlined />, label: "Ta'lim" },
         {
-            key: '/messages',
-            icon: <Badge count={unreadCount} size="small" offset={[8, 0]}><MailOutlined /></Badge>,
-            label: 'Xabarlar'
+            key: '/consultations',
+            icon: <PhoneOutlined />,
+            label: 'Maslahat',
         },
+        {
+            key: '/contacts',
+            icon: <MailOutlined />,
+            label: 'Xabarlar',
+        },
+
     ]
 
     const handleLogout = () => {
@@ -110,73 +156,12 @@ const MainLayout = () => {
         return `${days[now.getDay()]}, ${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`
     }
 
-    const SidebarContent = () => (
-        <div className="flex flex-col h-full">
-            {/* Logo Section */}
-            <div
-                className="h-14 flex items-center justify-center border-b shrink-0"
-                style={{ borderColor: 'var(--border-color)' }}
-            >
-                <div className="flex items-center gap-2">
-                    <div
-                        className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm"
-                        style={{ background: 'var(--primary-color)' }}
-                    >
-                        <AppstoreAddOutlined />
-                    </div>
-                    {(!collapsed || mobileOpen) && (
-                        <Text strong className="text-base" style={{ color: 'var(--text-primary)' }}>
-                            Admin Panel
-                        </Text>
-                    )}
-                </div>
-            </div>
-
-            {/* Navigation Menu */}
-            <div className="flex-1 py-3 overflow-y-auto">
-                <Menu
-                    theme="light"
-                    mode="inline"
-                    selectedKeys={[location.pathname]}
-                    items={menuItems}
-                    onClick={({ key }) => {
-                        navigate(key)
-                        setMobileOpen(false)
-                    }}
-                    className="border-none"
-                    style={{ background: 'transparent' }}
-                />
-            </div>
-
-            {/* User Info at Bottom */}
-            {(!collapsed || mobileOpen) && (
-                <div className="p-3 border-t shrink-0" style={{ borderColor: 'var(--border-color)' }}>
-                    <div
-                        className="p-2 rounded-lg flex items-center gap-2"
-                        style={{ background: 'var(--bg-input)' }}
-                    >
-                        <Avatar
-                            size={32}
-                            icon={<UserOutlined />}
-                            src={user?.avatar}
-                            style={{
-                                backgroundColor: 'var(--primary-light)',
-                                color: 'var(--primary-color)',
-                            }}
-                        />
-                        <div className="flex-1 min-w-0">
-                            <Text strong className="block truncate text-sm" style={{ color: 'var(--text-primary)' }}>
-                                {user?.name || 'User'}
-                            </Text>
-                            <Text className="text-xs truncate block" style={{ color: 'var(--text-muted)' }}>
-                                {user?.email || 'admin@portfolio.com'}
-                            </Text>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </div>
-    )
+    const handleMenuClick = ({ key }: { key: string }) => {
+        if (key.startsWith('/')) {
+            navigate(key)
+            setMobileOpen(false)
+        }
+    }
 
     return (
         <Layout className="min-h-screen" style={{ background: 'var(--bg-primary)' }}>
@@ -185,7 +170,7 @@ const MainLayout = () => {
                 trigger={null}
                 collapsible
                 collapsed={collapsed}
-                theme="light"
+                theme={currentTheme === 'dark' ? 'dark' : 'light'}
                 width={220}
                 collapsedWidth={64}
                 className="hidden md:block border-r h-screen sticky top-0"
@@ -194,7 +179,14 @@ const MainLayout = () => {
                     borderColor: 'var(--border-color)'
                 }}
             >
-                <SidebarContent />
+                <SidebarContent
+                    collapsed={collapsed}
+                    mobileOpen={mobileOpen}
+                    user={user}
+                    location={location}
+                    menuItems={menuItems}
+                    onMenuClick={handleMenuClick}
+                />
             </Sider>
 
             {/* Mobile Drawer */}
@@ -206,7 +198,14 @@ const MainLayout = () => {
                 styles={{ body: { padding: 0, background: 'var(--bg-sidebar)' } }}
                 closable={false}
             >
-                <SidebarContent />
+                <SidebarContent
+                    collapsed={collapsed}
+                    mobileOpen={mobileOpen}
+                    user={user}
+                    location={location}
+                    menuItems={menuItems}
+                    onMenuClick={handleMenuClick}
+                />
             </Drawer>
 
             <Layout style={{ background: 'transparent' }}>
@@ -295,6 +294,83 @@ const MainLayout = () => {
                 </Content>
             </Layout>
         </Layout>
+    )
+}
+
+interface SidebarContentProps {
+    collapsed: boolean
+    mobileOpen: boolean
+    user: any
+    location: any
+    menuItems: any[]
+    onMenuClick: (info: { key: string }) => void
+}
+
+const SidebarContent = ({ collapsed, mobileOpen, user, location, menuItems, onMenuClick }: SidebarContentProps) => {
+    const { theme: currentTheme } = useThemeStore()
+
+    return (
+        <div className="flex flex-col h-full">
+            {/* Logo Section */}
+            <div
+                className="h-14 flex items-center justify-center border-b shrink-0"
+                style={{ borderColor: 'var(--border-color)' }}
+            >
+                <div className="flex items-center gap-2">
+                    <div
+                        className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm"
+                        style={{ background: 'var(--primary-color)' }}
+                    >
+                        <AppstoreAddOutlined />
+                    </div>
+                    {(!collapsed || mobileOpen) && (
+                        <Text strong className="text-base" style={{ color: 'var(--text-primary)' }}>
+                            Admin Panel
+                        </Text>
+                    )}
+                </div>
+            </div>
+
+            {/* Navigation Menu */}
+            <div className="flex-1 py-3 overflow-y-auto">
+                <Menu
+                    mode="inline"
+                    selectedKeys={[location.pathname]}
+                    items={menuItems}
+                    onClick={onMenuClick}
+                    className="border-none"
+                    style={{ background: 'transparent' }}
+                    theme={currentTheme === 'dark' ? 'dark' : 'light'}
+                />
+            </div>
+
+            {/* User Info at Bottom */}
+            {(!collapsed || mobileOpen) && (
+                <div className="p-3 border-t shrink-0" style={{ borderColor: 'var(--border-color)' }}>
+                    <div
+                        className="p-2 rounded-lg flex items-center gap-2"
+                        style={{ background: 'var(--bg-input)' }}
+                    >
+                        <Avatar
+                            size={32}
+                            icon={<UserOutlined />}
+                            src={user?.avatar}
+                            style={{
+                                backgroundColor: 'var(--primary-light)',
+                                color: 'var(--primary-color)',
+                            }}
+                        />
+                        <div className="flex-1 min-w-0">
+                            <Text strong className="block truncate text-sm" style={{ color: 'var(--text-primary)' }}>
+                                {user?.name || 'User'}</Text>
+                            <Text className="text-xs truncate block" style={{ color: 'var(--text-muted)' }}>
+                                {user?.email || 'admin@portfolio.com'}
+                            </Text>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
     )
 }
 

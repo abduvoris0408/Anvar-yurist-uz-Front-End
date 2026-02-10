@@ -37,7 +37,9 @@ const ExperiencesPage = () => {
             queryClient.invalidateQueries({ queryKey: ['experiences'] })
             handleCloseDrawer()
         },
-        onError: () => message.error('Xatolik yuz berdi'),
+        onError: (error: any) => {
+            message.error(error.response?.data?.error || error.message || 'Xatolik yuz berdi')
+        },
     })
 
     const updateMutation = useMutation({
@@ -47,7 +49,9 @@ const ExperiencesPage = () => {
             queryClient.invalidateQueries({ queryKey: ['experiences'] })
             handleCloseDrawer()
         },
-        onError: () => message.error('Xatolik yuz berdi'),
+        onError: (error: any) => {
+            message.error(error.response?.data?.error || error.message || 'Xatolik yuz berdi')
+        },
     })
 
     const deleteMutation = useMutation({
@@ -66,7 +70,7 @@ const ExperiencesPage = () => {
                 ...experience,
                 startDate: experience.startDate ? dayjs(experience.startDate) : null,
                 endDate: experience.endDate ? dayjs(experience.endDate) : null,
-                technologies: experience.technologies?.join(', '),
+                // technologies: experience.technologies?.join(', '), // Removed
             })
         } else {
             setEditingExperience(null)
@@ -84,15 +88,15 @@ const ExperiencesPage = () => {
     const handleSubmit = async (values: Record<string, unknown>) => {
         const data = {
             ...values,
-            startDate: values.startDate ? (values.startDate as dayjs.Dayjs).toISOString() : undefined,
-            endDate: values.current ? null : (values.endDate ? (values.endDate as dayjs.Dayjs).toISOString() : undefined),
-            technologies: typeof values.technologies === 'string'
-                ? values.technologies.split(',').map((t: string) => t.trim()).filter(Boolean)
-                : values.technologies,
+            startDate: values.startDate ? (values.startDate as dayjs.Dayjs).format('YYYY-MM-DD') : undefined,
+            endDate: values.current ? null : (values.endDate ? (values.endDate as dayjs.Dayjs).format('YYYY-MM-DD') : undefined),
+            specializations: typeof values.specializations === 'string'
+                ? (values.specializations as string).split(',').map((t: string) => t.trim()).filter(Boolean)
+                : values.specializations,
         } as Partial<Experience>
 
         if (editingExperience) {
-            updateMutation.mutate({ id: editingExperience._id, data })
+            updateMutation.mutate({ id: editingExperience.id, data })
         } else {
             createMutation.mutate(data)
         }
@@ -132,7 +136,7 @@ const ExperiencesPage = () => {
             render: (_, record) => (
                 <ActionButtons
                     onEdit={() => handleOpenDrawer(record)}
-                    onDelete={() => deleteMutation.mutate(record._id)}
+                    onDelete={() => deleteMutation.mutate(record.id)}
                     deleteLoading={deleteMutation.isPending}
                 />
             ),
@@ -151,7 +155,7 @@ const ExperiencesPage = () => {
                 <Table
                     columns={columns}
                     dataSource={filteredData}
-                    rowKey="_id"
+                    rowKey="id"
                     loading={isLoading}
                     pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (total) => `Jami: ${total}` }}
                     size="middle"
@@ -182,17 +186,17 @@ const ExperiencesPage = () => {
                 </Form.Item>
                 <Space className="w-full" size="middle">
                     <Form.Item name="startDate" label="Boshlanish" rules={[{ required: true }]}>
-                        <DatePicker picker="month" />
+                        <DatePicker className="w-full" format="YYYY-MM-DD" />
                     </Form.Item>
                     <Form.Item name="endDate" label="Tugash">
-                        <DatePicker picker="month" />
+                        <DatePicker className="w-full" format="YYYY-MM-DD" />
                     </Form.Item>
                 </Space>
                 <Form.Item name="current" label="Hozirda ishlayapman" valuePropName="checked">
                     <Switch />
                 </Form.Item>
-                <Form.Item name="technologies" label="Texnologiyalar (vergul bilan)">
-                    <Input placeholder="React, Node.js, MongoDB" />
+                <Form.Item name="specializations" label="Ixtisoslashuvlar (vergul bilan)">
+                    <Input placeholder="Korporativ huquq, Mehnat huquqi" />
                 </Form.Item>
                 <Form.Item name="companyUrl" label="Kompaniya URL">
                     <Input placeholder="https://google.com" />

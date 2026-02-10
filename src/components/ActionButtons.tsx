@@ -5,6 +5,7 @@ interface ActionButtonsProps {
     onEdit?: () => void
     onDelete?: () => void
     onView?: () => void
+    viewIcon?: React.ReactNode
     deleteLoading?: boolean
     deleteTitle?: string
     size?: 'small' | 'middle' | 'large'
@@ -14,6 +15,7 @@ const ActionButtons = ({
     onEdit,
     onDelete,
     onView,
+    viewIcon,
     deleteLoading = false,
     deleteTitle = "O'chirishni tasdiqlaysizmi?",
     size = 'small',
@@ -23,7 +25,7 @@ const ActionButtons = ({
             {onView && (
                 <Tooltip title="Ko'rish">
                     <Button
-                        icon={<EyeOutlined />}
+                        icon={viewIcon || <EyeOutlined />}
                         size={size}
                         onClick={onView}
                     />

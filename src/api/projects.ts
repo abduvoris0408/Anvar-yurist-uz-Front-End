@@ -26,4 +26,16 @@ export const projectsApi = {
         const { data } = await api.delete(`/projects/${id}`)
         return data
     },
+
+    uploadGallery: async (id: string, formData: FormData): Promise<ApiResponse<Project>> => {
+        const { data } = await api.put(`/projects/${id}/gallery`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        })
+        return data
+    },
+
+    deleteGalleryImage: async (id: string, index: number): Promise<ApiResponse<Project>> => {
+        const { data } = await api.delete(`/projects/${id}/gallery/${index}`)
+        return data
+    },
 }

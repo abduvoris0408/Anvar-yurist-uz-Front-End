@@ -1,25 +1,28 @@
 import api from './client'
-import type {
-    AuthResponse,
-    LoginCredentials,
-    RegisterData,
-    User,
-    ApiResponse
-} from '../types'
+import type { ApiResponse, User } from '../types'
+
+interface LoginResponse {
+    success: boolean
+    data: {
+        accessToken: string
+        refreshToken: string
+        user: User
+    }
+}
 
 export const authApi = {
-    login: async (credentials: LoginCredentials): Promise<AuthResponse> => {
+    login: async (credentials: { email: string; password: string }): Promise<LoginResponse> => {
         const { data } = await api.post('/auth/login', credentials)
         return data
     },
 
-    register: async (userData: RegisterData): Promise<AuthResponse> => {
-        const { data } = await api.post('/auth/register', userData)
+    refreshToken: async (refreshToken: string): Promise<LoginResponse> => {
+        const { data } = await api.post('/auth/refresh-token', { refreshToken })
         return data
     },
 
     logout: async (): Promise<void> => {
-        await api.get('/auth/logout')
+        await api.post('/auth/logout')
     },
 
     getMe: async (): Promise<ApiResponse<User>> => {
@@ -28,12 +31,12 @@ export const authApi = {
     },
 
     updateDetails: async (userData: Partial<User>): Promise<ApiResponse<User>> => {
-        const { data } = await api.put('/auth/updatedetails', userData)
+        const { data } = await api.put('/auth/update-details', userData)
         return data
     },
 
     updatePassword: async (passwords: { currentPassword: string; newPassword: string }): Promise<ApiResponse<User>> => {
-        const { data } = await api.put('/auth/updatepassword', passwords)
+        const { data } = await api.put('/auth/update-password', passwords)
         return data
     },
 }

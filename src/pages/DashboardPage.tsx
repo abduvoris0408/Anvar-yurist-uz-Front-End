@@ -3,7 +3,6 @@ import {
     ProjectOutlined,
     ToolOutlined,
     TeamOutlined,
-    MailOutlined,
     ReadOutlined,
     AppstoreOutlined,
     EyeOutlined,
@@ -11,7 +10,7 @@ import {
     TrophyOutlined,
 } from '@ant-design/icons'
 import { useQuery } from '@tanstack/react-query'
-import { projectsApi, skillsApi, experiencesApi, educationApi, contactApi, categoriesApi } from '../api'
+import { projectsApi, skillsApi, experiencesApi, educationApi, categoriesApi } from '../api'
 import { useNavigate } from 'react-router-dom'
 
 const { Title, Text, Paragraph } = Typography
@@ -44,48 +43,36 @@ const DashboardPage = () => {
         queryFn: () => educationApi.getAll({ limit: 100 }),
     })
 
-    const { data: contactStats } = useQuery({
-        queryKey: ['contact-stats'],
-        queryFn: () => contactApi.getStats(),
-    })
-
     const stats = [
         {
             title: 'Loyihalar',
-            value: projects?.total || 0,
+            value: projects?.count || projects?.data?.length || 0,
             icon: <ProjectOutlined style={{ fontSize: 22 }} />,
             color: 'var(--primary-color)',
         },
         {
             title: "Ko'nikmalar",
-            value: skills?.total || 0,
+            value: skills?.count || skills?.data?.length || 0,
             icon: <ToolOutlined style={{ fontSize: 22 }} />,
             color: '#10b981',
         },
         {
             title: 'Kategoriyalar',
-            value: categories?.total || 0,
+            value: categories?.count || categories?.data?.length || 0,
             icon: <AppstoreOutlined style={{ fontSize: 22 }} />,
             color: '#8b5cf6',
         },
         {
             title: 'Tajribalar',
-            value: experiences?.total || 0,
+            value: experiences?.count || experiences?.data?.length || 0,
             icon: <TeamOutlined style={{ fontSize: 22 }} />,
             color: '#f59e0b',
         },
         {
             title: "Ta'lim",
-            value: education?.total || 0,
+            value: education?.count || education?.data?.length || 0,
             icon: <ReadOutlined style={{ fontSize: 22 }} />,
             color: '#06b6d4',
-        },
-        {
-            title: "Yangi xabarlar",
-            value: contactStats?.data?.unread || 0,
-            icon: <MailOutlined style={{ fontSize: 22 }} />,
-            color: '#ef4444',
-            isAlert: true,
         },
     ]
 
@@ -107,7 +94,6 @@ const DashboardPage = () => {
                                 else if (stat.title === 'Kategoriyalar') navigate('/categories')
                                 else if (stat.title === 'Tajribalar') navigate('/experiences')
                                 else if (stat.title === "Ta'lim") navigate('/education')
-                                else if (stat.title === 'Yangi xabarlar') navigate('/messages')
                             }}
                         >
                             <Space direction="vertical" className="w-full" size={8}>
@@ -121,9 +107,6 @@ const DashboardPage = () => {
                                     >
                                         {stat.icon}
                                     </div>
-                                    {stat.isAlert && stat.value > 0 && (
-                                        <Tag color="error" className="m-0">Yangi</Tag>
-                                    )}
                                 </div>
                                 <div>
                                     <Text style={{ color: 'var(--text-secondary)' }} className="text-xs uppercase tracking-wider font-medium">
@@ -157,7 +140,7 @@ const DashboardPage = () => {
                             <List
                                 itemLayout="horizontal"
                                 dataSource={recentProjects}
-                                renderItem={(project) => (
+                                renderItem={(project: any) => (
                                     <List.Item
                                         className="rounded-lg px-3 transition-colors cursor-pointer"
                                         style={{ borderColor: 'var(--border-color)' }}
@@ -179,7 +162,7 @@ const DashboardPage = () => {
                                             title={
                                                 <Space>
                                                     <Text strong style={{ color: 'var(--text-primary)' }}>{project.title}</Text>
-                                                    {project.featured && <Tag color="gold" icon={<TrophyOutlined />}>Featured</Tag>}
+                                                    {project.isFeatured && <Tag color="gold" icon={<TrophyOutlined />}>Featured</Tag>}
                                                 </Space>
                                             }
                                             description={
@@ -220,8 +203,8 @@ const DashboardPage = () => {
                     >
                         {topSkills.length > 0 ? (
                             <Space direction="vertical" className="w-full" size={12}>
-                                {topSkills.map((skill, index) => (
-                                    <div key={skill._id}>
+                                {topSkills.map((skill: any, index: number) => (
+                                    <div key={skill.id}>
                                         <div className="flex items-center justify-between mb-2">
                                             <Space>
                                                 <div
@@ -271,7 +254,6 @@ const DashboardPage = () => {
                         { title: 'Yangi Loyiha', icon: <ProjectOutlined />, path: '/projects', color: 'var(--primary-color)' },
                         { title: "Yangi Ko'nikma", icon: <ToolOutlined />, path: '/skills', color: '#10b981' },
                         { title: 'Yangi Tajriba', icon: <TeamOutlined />, path: '/experiences', color: '#f59e0b' },
-                        { title: 'Xabarlarni Ko\'rish', icon: <MailOutlined />, path: '/messages', color: '#ef4444' },
                     ].map((action, index) => (
                         <Col xs={12} sm={6} key={index}>
                             <Card

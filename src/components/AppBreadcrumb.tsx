@@ -4,9 +4,15 @@ import { Link, useLocation } from 'react-router-dom'
 
 const routeLabels: Record<string, string> = {
     '': 'Dashboard',
+    'about': 'Men haqimda',
     'projects': 'Loyihalar',
     'skills': "Ko'nikmalar",
+    'services': 'Xizmatlar',
     'categories': 'Kategoriyalar',
+    'tags': 'Teglar',
+    'blog-posts': 'Blog Postlar',
+    'blog-comments': 'Blog Izohlar',
+    'news': 'Yangiliklar',
     'experiences': 'Tajriba',
     'education': "Ta'lim",
     'messages': 'Xabarlar',

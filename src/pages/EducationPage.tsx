@@ -37,7 +37,9 @@ const EducationPage = () => {
             queryClient.invalidateQueries({ queryKey: ['education'] })
             handleCloseDrawer()
         },
-        onError: () => message.error('Xatolik yuz berdi'),
+        onError: (error: any) => {
+            message.error(error.response?.data?.error || error.message || 'Xatolik yuz berdi')
+        },
     })
 
     const updateMutation = useMutation({
@@ -47,7 +49,9 @@ const EducationPage = () => {
             queryClient.invalidateQueries({ queryKey: ['education'] })
             handleCloseDrawer()
         },
-        onError: () => message.error('Xatolik yuz berdi'),
+        onError: (error: any) => {
+            message.error(error.response?.data?.error || error.message || 'Xatolik yuz berdi')
+        },
     })
 
     const deleteMutation = useMutation({
@@ -80,122 +84,128 @@ const EducationPage = () => {
         form.resetFields()
     }
 
-    const handleSubmit = async (values: Record<string, unknown>) => {
-        const data = {
-            ...values,
-            startDate: values.startDate ? (values.startDate as dayjs.Dayjs).toISOString() : undefined,
-            endDate: values.current ? null : (values.endDate ? (values.endDate as dayjs.Dayjs).toISOString() : undefined),
-        } as Partial<Education>
+    const data = {
+        ...values,
+        startDate: values.startDate ? (values.startDate as dayjs.Dayjs).format('YYYY-MM-DD') : undefined,
+        endDate: values.current ? null : (values.endDate ? (values.endDate as dayjs.Dayjs).format('YYYY-MM-DD') : undefined),
+        gpa: values.gpa ? Number(values.gpa) : undefined,
+        achievements: typeof values.achievements === 'string'
+            ? (values.achievements as string).split(',').map((t: string) => t.trim()).filter(Boolean)
+            : values.achievements,
+    } as Partial<Education>
 
-        if (editingEducation) {
-            updateMutation.mutate({ id: editingEducation._id, data })
-        } else {
-            createMutation.mutate(data)
-        }
+    if (editingEducation) {
+        updateMutation.mutate({ id: editingEducation.id, data })
+    } else {
+        createMutation.mutate(data)
     }
+}
 
-    const columns: ColumnsType<Education> = [
-        {
-            title: "O'quv muassasasi",
-            dataIndex: 'school',
-            key: 'school',
-            sorter: (a, b) => a.school.localeCompare(b.school),
-            render: (text) => <strong>{text}</strong>
-        },
-        {
-            title: 'Daraja',
-            dataIndex: 'degree',
-            key: 'degree'
-        },
-        {
-            title: "Yo'nalish",
-            dataIndex: 'fieldOfStudy',
-            key: 'fieldOfStudy'
-        },
-        {
-            title: 'Davr',
-            key: 'period',
-            render: (_, record) => (
-                <span>
-                    {dayjs(record.startDate).format('YYYY')} - {record.current ? <Tag color="green">Hozir</Tag> : dayjs(record.endDate).format('YYYY')}
-                </span>
-            ),
-        },
-        {
-            title: 'Amallar',
-            key: 'actions',
-            width: 100,
-            render: (_, record) => (
-                <ActionButtons
-                    onEdit={() => handleOpenDrawer(record)}
-                    onDelete={() => deleteMutation.mutate(record._id)}
-                    deleteLoading={deleteMutation.isPending}
-                />
-            ),
-        },
-    ]
+const columns: ColumnsType<Education> = [
+    {
+        title: "O'quv muassasasi",
+        dataIndex: 'school',
+        key: 'school',
+        sorter: (a, b) => a.school.localeCompare(b.school),
+        render: (text) => <strong>{text}</strong>
+    },
+    {
+        title: 'Daraja',
+        dataIndex: 'degree',
+        key: 'degree'
+    },
+    {
+        title: "Yo'nalish",
+        dataIndex: 'fieldOfStudy',
+        key: 'fieldOfStudy'
+    },
+    {
+        title: 'Davr',
+        key: 'period',
+        render: (_, record) => (
+            <span>
+                {dayjs(record.startDate).format('YYYY')} - {record.current ? <Tag color="green">Hozir</Tag> : dayjs(record.endDate).format('YYYY')}
+            </span>
+        ),
+    },
+    {
+        title: 'Amallar',
+        key: 'actions',
+        width: 100,
+        render: (_, record) => (
+            <ActionButtons
+                onEdit={() => handleOpenDrawer(record)}
+                onDelete={() => deleteMutation.mutate(record.id)}
+                deleteLoading={deleteMutation.isPending}
+            />
+        ),
+    },
+]
 
-    return (
-        <>
-            <PageHeader
-                title="Ta'lim"
-                onAdd={() => handleOpenDrawer()}
-                addButtonText="Yangi ta'lim"
-                onSearch={setSearchText}
-                searchPlaceholder="Ta'limni qidirish..."
-            >
-                <Table
-                    columns={columns}
-                    dataSource={filteredData}
-                    rowKey="_id"
-                    loading={isLoading}
-                    pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (total) => `Jami: ${total}` }}
-                    size="middle"
-                />
-            </PageHeader>
+return (
+    <>
+        <PageHeader
+            title="Ta'lim"
+            onAdd={() => handleOpenDrawer()}
+            addButtonText="Yangi ta'lim"
+            onSearch={setSearchText}
+            searchPlaceholder="Ta'limni qidirish..."
+        >
+            <Table
+                columns={columns}
+                dataSource={filteredData}
+                rowKey="id"
+                loading={isLoading}
+                pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (total) => `Jami: ${total}` }}
+                size="middle"
+            />
+        </PageHeader>
 
-            <CrudDrawer
-                open={isDrawerOpen}
-                onClose={handleCloseDrawer}
-                title={editingEducation ? "Ta'limni tahrirlash" : "Yangi ta'lim"}
-                loading={createMutation.isPending || updateMutation.isPending}
-                form={form}
-                onSubmit={handleSubmit}
-                isEdit={!!editingEducation}
-                width={450}
-            >
-                <Form.Item name="school" label="O'quv muassasasi" rules={[{ required: true }]}>
-                    <Input placeholder="TATU" />
+        <CrudDrawer
+            open={isDrawerOpen}
+            onClose={handleCloseDrawer}
+            title={editingEducation ? "Ta'limni tahrirlash" : "Yangi ta'lim"}
+            loading={createMutation.isPending || updateMutation.isPending}
+            form={form}
+            onSubmit={handleSubmit}
+            isEdit={!!editingEducation}
+            width={450}
+        >
+            <Form.Item name="school" label="O'quv muassasasi" rules={[{ required: true }]}>
+                <Input placeholder="TATU" />
+            </Form.Item>
+            <Form.Item name="degree" label="Daraja" rules={[{ required: true }]}>
+                <Input placeholder="Bakalavr" />
+            </Form.Item>
+            <Form.Item name="fieldOfStudy" label="O'qish yo'nalishi" rules={[{ required: true }]}>
+                <Input placeholder="Kompyuter fanlari" />
+            </Form.Item>
+            <Form.Item name="location" label="Joylashuv">
+                <Input placeholder="Toshkent, O'zbekiston" />
+            </Form.Item>
+            <Form.Item name="description" label="Tavsif">
+                <TextArea rows={3} placeholder="Ta'lim haqida" />
+            </Form.Item>
+            <Space className="w-full" size="middle">
+                <Form.Item name="startDate" label="Boshlanish" rules={[{ required: true }]}>
+                    <DatePicker className="w-full" format="YYYY-MM-DD" />
                 </Form.Item>
-                <Form.Item name="degree" label="Daraja" rules={[{ required: true }]}>
-                    <Input placeholder="Bakalavr" />
+                <Form.Item name="endDate" label="Tugash">
+                    <DatePicker className="w-full" format="YYYY-MM-DD" />
                 </Form.Item>
-                <Form.Item name="fieldOfStudy" label="O'qish yo'nalishi" rules={[{ required: true }]}>
-                    <Input placeholder="Kompyuter fanlari" />
-                </Form.Item>
-                <Form.Item name="location" label="Joylashuv">
-                    <Input placeholder="Toshkent, O'zbekiston" />
-                </Form.Item>
-                <Form.Item name="description" label="Tavsif">
-                    <TextArea rows={3} placeholder="Ta'lim haqida" />
-                </Form.Item>
-                <Space className="w-full" size="middle">
-                    <Form.Item name="startDate" label="Boshlanish" rules={[{ required: true }]}>
-                        <DatePicker picker="year" />
-                    </Form.Item>
-                    <Form.Item name="endDate" label="Tugash">
-                        <DatePicker picker="year" />
-                    </Form.Item>
-                </Space>
-                <Form.Item name="current" label="Hozirda o'qiyapman" valuePropName="checked">
-                    <Switch />
-                </Form.Item>
-                <Form.Item name="grade" label="Baho / GPA">
-                    <Input placeholder="4.5 GPA" />
-                </Form.Item>
-            </CrudDrawer>
-        </>
-    )
+            </Space>
+            <Form.Item name="current" label="Hozirda o'qiyapman" valuePropName="checked">
+                <Switch />
+            </Form.Item>
+            <Form.Item name="gpa" label="GPA (Baho)">
+                <Input type="number" step="0.1" placeholder="4.5" />
+            </Form.Item>
+            <Form.Item name="achievements" label="Yutuqlar (vergul bilan)">
+                <Input placeholder="Stipendiat, Olim, ..." />
+            </Form.Item>
+        </CrudDrawer>
+    </>
+)
 }
 
 export default EducationPage

@@ -16,10 +16,9 @@ const LoginPage = () => {
 
     const loginMutation = useMutation({
         mutationFn: (credentials: LoginCredentials) => authApi.login(credentials),
-        onSuccess: (data) => {
-            if (data.token && data.user) {
-                localStorage.setItem('token', data.token)
-                setAuth(data.token, data.user)
+        onSuccess: (response) => {
+            if (response.data?.accessToken && response.data?.user) {
+                setAuth(response.data.accessToken, response.data.refreshToken, response.data.user)
                 message.success('Tizimga muvaffaqiyatli kiringiz')
                 navigate('/')
             }

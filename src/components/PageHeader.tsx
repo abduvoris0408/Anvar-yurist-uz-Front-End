@@ -1,21 +1,24 @@
 import { ReactNode } from 'react'
-import { Card, Button, Input, Space, Row, Col } from 'antd'
+import { Card, Button, Input, Space, Row, Col, Typography } from 'antd'
 import { PlusOutlined, SearchOutlined } from '@ant-design/icons'
 
 const { Search } = Input
+const { Text } = Typography
 
 interface PageHeaderProps {
     title: string
+    subtitle?: string
     onAdd?: () => void
     addButtonText?: string
     onSearch?: (value: string) => void
     searchPlaceholder?: string
     extra?: ReactNode
-    children: ReactNode
+    children?: ReactNode
 }
 
 const PageHeader = ({
     title,
+    subtitle,
     onAdd,
     addButtonText = "Yangi qo'shish",
     onSearch,
@@ -25,7 +28,16 @@ const PageHeader = ({
 }: PageHeaderProps) => {
     return (
         <Card
-            title={title}
+            title={
+                <div>
+                    <span>{title}</span>
+                    {subtitle && (
+                        <Text style={{ display: 'block', fontSize: 13, fontWeight: 400, color: 'var(--text-muted)', marginTop: 2 }}>
+                            {subtitle}
+                        </Text>
+                    )}
+                </div>
+            }
             extra={
                 <Space>
                     {extra}

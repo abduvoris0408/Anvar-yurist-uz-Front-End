@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Table, Form, Input, ColorPicker, Tag, message } from 'antd'
+import { Table, Form, Input, ColorPicker, Tag, message, Select } from 'antd'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { categoriesApi } from '../api'
 import { PageHeader, CrudDrawer, ActionButtons } from '../components'
@@ -35,7 +35,11 @@ const CategoriesPage = () => {
             queryClient.invalidateQueries({ queryKey: ['categories'] })
             handleCloseDrawer()
         },
-        onError: () => message.error('Xatolik yuz berdi'),
+        onError: (error: any) => {
+            console.error('Create Category Error:', error)
+            const errMsg = error.response?.data?.error || error.response?.data?.message || error.message || 'Noma\'lum xatolik'
+            message.error(errMsg)
+        },
     })
 
     const updateMutation = useMutation({
@@ -45,7 +49,11 @@ const CategoriesPage = () => {
             queryClient.invalidateQueries({ queryKey: ['categories'] })
             handleCloseDrawer()
         },
-        onError: () => message.error('Xatolik yuz berdi'),
+        onError: (error: any) => {
+            console.error('Update Category Error:', error)
+            const errMsg = error.response?.data?.error || error.response?.data?.message || error.message || 'Noma\'lum xatolik'
+            message.error(errMsg)
+        },
     })
 
     const deleteMutation = useMutation({
@@ -54,7 +62,11 @@ const CategoriesPage = () => {
             message.success("Kategoriya o'chirildi!")
             queryClient.invalidateQueries({ queryKey: ['categories'] })
         },
-        onError: () => message.error('Xatolik yuz berdi'),
+        onError: (error: any) => {
+            console.error('Delete Category Error:', error)
+            const errMsg = error.response?.data?.error || error.response?.data?.message || error.message || 'Noma\'lum xatolik'
+            message.error(errMsg)
+        },
     })
 
     const handleOpenDrawer = (category?: Category) => {
@@ -81,7 +93,7 @@ const CategoriesPage = () => {
         } as Partial<Category>
 
         if (editingCategory) {
-            updateMutation.mutate({ id: editingCategory._id, data })
+            updateMutation.mutate({ id: editingCategory.id, data })
         } else {
             createMutation.mutate(data)
         }
@@ -122,7 +134,7 @@ const CategoriesPage = () => {
             render: (_, record) => (
                 <ActionButtons
                     onEdit={() => handleOpenDrawer(record)}
-                    onDelete={() => deleteMutation.mutate(record._id)}
+                    onDelete={() => deleteMutation.mutate(record.id)}
                     deleteLoading={deleteMutation.isPending}
                 />
             ),
@@ -141,7 +153,7 @@ const CategoriesPage = () => {
                 <Table
                     columns={columns}
                     dataSource={filteredData}
-                    rowKey="_id"
+                    rowKey="id"
                     loading={isLoading}
                     pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (total) => `Jami: ${total}` }}
                     size="middle"
@@ -159,6 +171,15 @@ const CategoriesPage = () => {
             >
                 <Form.Item name="name" label="Nomi" rules={[{ required: true }]}>
                     <Input placeholder="Web Development" />
+                </Form.Item>
+                <Form.Item name="type" label="Turi" rules={[{ required: true, message: 'Kategoriya turini tanlang' }]}>
+                    <Select placeholder="Turini tanlang">
+                        <Select.Option value="project">Loyiha</Select.Option>
+                        <Select.Option value="blog">Blog</Select.Option>
+                        <Select.Option value="service">Xizmat</Select.Option>
+                        <Select.Option value="skill">Ko'nikma</Select.Option>
+                        <Select.Option value="news">Yangilik</Select.Option>
+                    </Select>
                 </Form.Item>
                 <Form.Item name="description" label="Tavsif">
                     <TextArea rows={3} placeholder="Kategoriya tavsifi" />
