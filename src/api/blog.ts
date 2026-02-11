@@ -33,6 +33,20 @@ export const blogApi = {
         return data
     },
 
+    uploadImage: async (id: string, file: File): Promise<ApiResponse<BlogPost>> => {
+        const formData = new FormData()
+        formData.append('image', file)
+        const { data } = await api.put(`/blog-posts/${id}/image`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        })
+        return data
+    },
+
+    deleteImage: async (id: string): Promise<ApiResponse<null>> => {
+        const { data } = await api.delete(`/blog-posts/${id}/image`)
+        return data
+    },
+
     // Blog Comments
     getAllComments: async (params?: Record<string, unknown>): Promise<ApiResponse<BlogComment[]>> => {
         const { data } = await api.get('/blog-comments', { params })

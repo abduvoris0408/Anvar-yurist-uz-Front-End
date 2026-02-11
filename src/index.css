@@ -798,6 +798,28 @@ body {
   color: var(--primary-color) !important;
 }
 
+/* Dark mode Tabs fixes */
+[data-theme='dark'] .ant-tabs {
+    color: var(--text-primary);
+}
+
+[data-theme='dark'] .ant-tabs-tab {
+    color: var(--text-secondary);
+}
+
+[data-theme='dark'] .ant-tabs-tab-active .ant-tabs-tab-btn {
+    color: var(--primary-color) !important;
+}
+
+[data-theme='dark'] .ant-tabs-ink-bar {
+    background: var(--primary-color);
+}
+
+[data-theme='dark'] .ant-descriptions-item-label,
+[data-theme='dark'] .ant-descriptions-item-content {
+    color: var(--text-primary);
+}
+
 /* Dark mode search input */
 [data-theme='dark'] .ant-input-search .ant-input,
 [data-theme='dark'] .ant-input-affix-wrapper {

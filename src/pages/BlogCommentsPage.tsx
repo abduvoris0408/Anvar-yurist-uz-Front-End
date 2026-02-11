@@ -133,7 +133,7 @@ const BlogCommentsPage = () => {
                     dataSource={commentsData?.data || []}
                     rowKey="id"
                     loading={isLoading}
-                    pagination={{ pageSize: 15 }}
+                    pagination={{ pageSize: 10 }}
                 />
             </Card>
         </div>

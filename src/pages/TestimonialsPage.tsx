@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
-import { Table, Form, Input, Rate, Tag, message, InputNumber, Switch } from 'antd'
+import { Table, Form, Input, Rate, Tag, message, InputNumber, Switch, Upload, Button } from 'antd'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { UploadOutlined, DeleteOutlined } from '@ant-design/icons'
 import { testimonialsApi } from '../api'
 import { PageHeader, CrudDrawer, ActionButtons } from '../components'
 import type { Testimonial } from '../types'
@@ -11,11 +12,11 @@ const { TextArea } = Input
 const TestimonialsPage = () => {
     const [isDrawerOpen, setIsDrawerOpen] = useState(false)
     const [editingId, setEditingId] = useState<string | null>(null)
+    const [editingTestimonial, setEditingTestimonial] = useState<Testimonial | null>(null)
     const [form] = Form.useForm()
     const queryClient = useQueryClient()
     const [searchText, setSearchText] = useState('')
 
-    // 1. Get Data
     const { data, isLoading } = useQuery({
         queryKey: ['testimonials'],
         queryFn: () => testimonialsApi.getAll(),
@@ -30,7 +31,6 @@ const TestimonialsPage = () => {
         )
     }, [data?.data, searchText])
 
-    // 2. Mutations
     const createMutation = useMutation({
         mutationFn: (newTestimonial: Partial<Testimonial>) => testimonialsApi.create(newTestimonial),
         onSuccess: () => {
@@ -72,15 +72,36 @@ const TestimonialsPage = () => {
         },
     })
 
-    // 3. Handlers
+    const uploadImageMutation = useMutation({
+        mutationFn: ({ id, file }: { id: string; file: File }) => testimonialsApi.uploadImage(id, file),
+        onSuccess: (response: any) => {
+            message.success('Rasm yuklandi!')
+            queryClient.invalidateQueries({ queryKey: ['testimonials'] })
+            setEditingTestimonial(prev => prev ? { ...prev, image: response.data?.image } as any : prev)
+        },
+        onError: () => message.error('Rasm yuklashda xatolik'),
+    })
+
+    const deleteImageMutation = useMutation({
+        mutationFn: (id: string) => testimonialsApi.deleteImage(id),
+        onSuccess: () => {
+            message.success("Rasm o'chirildi!")
+            queryClient.invalidateQueries({ queryKey: ['testimonials'] })
+            setEditingTestimonial(prev => prev ? { ...prev, image: undefined } as any : prev)
+        },
+        onError: () => message.error("Rasm o'chirishda xatolik"),
+    })
+
     const handleAdd = () => {
         setEditingId(null)
+        setEditingTestimonial(null)
         form.resetFields()
         setIsDrawerOpen(true)
     }
 
     const handleEdit = (record: Testimonial) => {
         setEditingId(record.id)
+        setEditingTestimonial(record)
         form.setFieldsValue(record)
         setIsDrawerOpen(true)
     }
@@ -88,18 +109,26 @@ const TestimonialsPage = () => {
     const handleClose = () => {
         setIsDrawerOpen(false)
         setEditingId(null)
+        setEditingTestimonial(null)
         form.resetFields()
     }
 
     const handleSubmit = (values: any) => {
+        const { image, ...rest } = values
         if (editingId) {
-            updateMutation.mutate({ id: editingId, data: values })
+            updateMutation.mutate({ id: editingId, data: rest })
         } else {
-            createMutation.mutate(values)
+            createMutation.mutate(rest)
         }
     }
 
-    // 4. Columns
+    const getImageUrl = (img: any): string | undefined => {
+        if (!img) return undefined
+        if (typeof img === 'string') return img
+        if (typeof img === 'object' && img.url) return img.url
+        return undefined
+    }
+
     const columns: TableColumnsType<Testimonial> = [
         {
             title: 'Mijoz',
@@ -185,15 +214,42 @@ const TestimonialsPage = () => {
                 </Form.Item>
 
                 <Form.Item name="clientPosition" label="Lavozimi">
-                    <Input placeholder="CEO, Google" />
+                    <Input placeholder="Direktor, Kompaniya" />
                 </Form.Item>
 
-                <Form.Item name="image" label="Rasm URL">
-                    <Input placeholder="https://..." />
-                </Form.Item>
+                {/* Rasm yuklash — faqat tahrirlashda */}
+                {editingTestimonial && (
+                    <Form.Item label="Mijoz rasmi">
+                        <div className="space-y-2">
+                            {getImageUrl(editingTestimonial.image) && (
+                                <div className="relative">
+                                    <img src={getImageUrl(editingTestimonial.image)} alt="Preview" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: '50%' }} />
+                                    <Button
+                                        danger size="small" icon={<DeleteOutlined />}
+                                        onClick={() => deleteImageMutation.mutate(editingTestimonial.id)}
+                                        loading={deleteImageMutation.isPending}
+                                        style={{ position: 'absolute', top: 0, right: 0 }}
+                                    />
+                                </div>
+                            )}
+                            <Upload
+                                showUploadList={false}
+                                accept="image/*"
+                                beforeUpload={(file) => {
+                                    uploadImageMutation.mutate({ id: editingTestimonial.id, file })
+                                    return false
+                                }}
+                            >
+                                <Button icon={<UploadOutlined />} loading={uploadImageMutation.isPending}>
+                                    Rasm yuklash
+                                </Button>
+                            </Upload>
+                        </div>
+                    </Form.Item>
+                )}
 
-                <Form.Item name="caseType" label="Loyiha turi">
-                    <Input placeholder="Web sayt, Mobil ilova..." />
+                <Form.Item name="caseType" label="Ish turi">
+                    <Input placeholder="Huquqiy maslahat, Shartnoma tayyorlash..." />
                 </Form.Item>
 
                 <Form.Item

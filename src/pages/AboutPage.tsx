@@ -135,12 +135,12 @@ const AboutPage = () => {
                         </Col>
                         <Col xs={24} md={12}>
                             <Form.Item name="title" label="Lavozim" rules={[{ required: true }]}>
-                                <Input placeholder="Full Stack Developer" />
+                                <Input placeholder="Yurist" />
                             </Form.Item>
                         </Col>
                         <Col xs={24} md={12}>
                             <Form.Item name="subtitle" label="Qo'shimcha sarlavha">
-                                <Input placeholder="Building modern web applications" />
+                                <Input placeholder="Professional huquqiy xizmatlar" />
                             </Form.Item>
                         </Col>
                         <Col xs={24} md={12}>
@@ -169,7 +169,7 @@ const AboutPage = () => {
                             </Form.Item>
                         </Col>
                         <Col xs={24} md={12}>
-                            <Form.Item name="freelanceStatus" label="Freelance holati">
+                            <Form.Item name="freelanceStatus" label="Konsultatsiya holati">
                                 <Select>
                                     <Select.Option value="available">Mavjud ✅</Select.Option>
                                     <Select.Option value="busy">Band 🔶</Select.Option>
@@ -184,12 +184,12 @@ const AboutPage = () => {
                         </Col>
                         <Col xs={24}>
                             <Form.Item name="shortBio" label="Qisqa bio">
-                                <Input placeholder="Full Stack Developer | Node.js & React" />
+                                <Input placeholder="Yurist | Huquqiy maslahatchi" />
                             </Form.Item>
                         </Col>
                         <Col xs={24}>
                             <Form.Item name="bio" label="To'liq bio">
-                                <TextArea rows={4} placeholder="Men 5 yillik tajribaga ega..." />
+                                <TextArea rows={4} placeholder="Men 10 yillik huquqiy tajribaga ega yuristman..." />
                             </Form.Item>
                         </Col>
                     </Row>
@@ -341,7 +341,7 @@ const AboutPage = () => {
                     >
                         <Row gutter={16}>
                             <Col xs={24} md={8}>
-                                <Form.Item name="projectsCompleted" label="Tugallangan loyihalar">
+                                <Form.Item name="projectsCompleted" label="Hal qilingan ishlar">
                                     <Input type="number" />
                                 </Form.Item>
                             </Col>
@@ -361,12 +361,12 @@ const AboutPage = () => {
                                 </Form.Item>
                             </Col>
                             <Col xs={24} md={8}>
-                                <Form.Item name="coffeesDrunk" label="Kofe ichilgan ☕">
+                                <Form.Item name="coffeesDrunk" label="Konsultatsiyalar ☎">
                                     <Input type="number" />
                                 </Form.Item>
                             </Col>
                             <Col xs={24} md={8}>
-                                <Form.Item name="linesOfCode" label="Kod qatorlari">
+                                <Form.Item name="linesOfCode" label="Shartnomalar">
                                     <Input type="number" />
                                 </Form.Item>
                             </Col>
@@ -460,7 +460,7 @@ const AboutPage = () => {
                                                         label="Sarlavha"
                                                         rules={[{ required: true, message: 'Sarlavhani kiriting' }]}
                                                     >
-                                                        <Input placeholder="Web Development" />
+                                                        <Input placeholder="Huquqiy xizmatlar" />
                                                     </Form.Item>
                                                 </Col>
                                                 <Col xs={24} md={12}>
@@ -470,7 +470,7 @@ const AboutPage = () => {
                                                         label="Icon"
                                                         rules={[{ required: true, message: 'Icon kiriting' }]}
                                                     >
-                                                        <Input placeholder="code" />
+                                                        <Input placeholder="gavel" />
                                                     </Form.Item>
                                                 </Col>
                                                 <Col xs={24}>
@@ -480,7 +480,7 @@ const AboutPage = () => {
                                                         label="Tavsif"
                                                         rules={[{ required: true, message: 'Tavsifni kiriting' }]}
                                                     >
-                                                        <TextArea rows={2} placeholder="Men zamonaviy veb-saytlar yarataman..." />
+                                                        <TextArea rows={2} placeholder="Men professional huquqiy maslahat beraman..." />
                                                     </Form.Item>
                                                 </Col>
                                                 <Col xs={24} md={12}>

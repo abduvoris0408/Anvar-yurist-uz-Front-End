@@ -26,4 +26,18 @@ export const educationApi = {
         const { data } = await api.delete(`/education/${id}`)
         return data
     },
+
+    uploadLogo: async (id: string, file: File): Promise<ApiResponse<Education>> => {
+        const formData = new FormData()
+        formData.append('logo', file)
+        const { data } = await api.put(`/education/${id}/logo`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        })
+        return data
+    },
+
+    deleteLogo: async (id: string): Promise<ApiResponse<null>> => {
+        const { data } = await api.delete(`/education/${id}/logo`)
+        return data
+    },
 }

@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Table, Form, Input, Select, Switch, Space, Tag, message, Card, Button, Popconfirm } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined, LinkOutlined } from '@ant-design/icons'
+import { Table, Form, Input, Select, Switch, Space, Tag, message, Card, Button, Popconfirm, Upload } from 'antd'
+import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined, LinkOutlined, UploadOutlined } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { newsApi, categoriesApi, tagsApi } from '../api'
 import { PageHeader, CrudDrawer } from '../components'
@@ -74,11 +74,39 @@ const NewsPage = () => {
         },
     })
 
+    const uploadImageMutation = useMutation({
+        mutationFn: ({ id, file }: { id: string; file: File }) => newsApi.uploadImage(id, file),
+        onSuccess: (response: any) => {
+            message.success('Rasm yuklandi!')
+            queryClient.invalidateQueries({ queryKey: ['news'] })
+            setEditingNews(prev => prev ? { ...prev, image: response.data?.image } as any : prev)
+        },
+        onError: () => message.error('Rasm yuklashda xatolik'),
+    })
+
+    const deleteImageMutation = useMutation({
+        mutationFn: (id: string) => newsApi.deleteImage(id),
+        onSuccess: () => {
+            message.success("Rasm o'chirildi!")
+            queryClient.invalidateQueries({ queryKey: ['news'] })
+            setEditingNews(prev => prev ? { ...prev, image: undefined } as any : prev)
+        },
+        onError: () => message.error("Rasm o'chirishda xatolik"),
+    })
+
+    const getImageUrl = (img: any): string | undefined => {
+        if (!img) return undefined
+        if (typeof img === 'string') return img
+        if (typeof img === 'object' && img.url) return img.url
+        return undefined
+    }
+
     const handleSubmit = (values: Record<string, unknown>) => {
+        const { image, ...rest } = values
         if (editingNews) {
-            updateMutation.mutate({ id: editingNews.id, values })
+            updateMutation.mutate({ id: editingNews.id, values: rest })
         } else {
-            createMutation.mutate(values)
+            createMutation.mutate(rest)
         }
     }
 
@@ -190,9 +218,38 @@ const NewsPage = () => {
                 <Form.Item name="content" label="Content (HTML)">
                     <TextArea rows={6} placeholder="<p>Maqola matni...</p>" />
                 </Form.Item>
-                <Form.Item name="image" label="Rasm URL">
-                    <Input placeholder="https://..." />
-                </Form.Item>
+
+                {/* Rasm yuklash — faqat tahrirlashda */}
+                {editingNews && (
+                    <Form.Item label="Rasm">
+                        <div className="space-y-2">
+                            {getImageUrl(editingNews.image) && (
+                                <div className="relative">
+                                    <img src={getImageUrl(editingNews.image)} alt="Preview" style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 8 }} />
+                                    <Button
+                                        danger size="small" icon={<DeleteOutlined />}
+                                        onClick={() => deleteImageMutation.mutate(editingNews.id)}
+                                        loading={deleteImageMutation.isPending}
+                                        style={{ position: 'absolute', top: 8, right: 8 }}
+                                    />
+                                </div>
+                            )}
+                            <Upload
+                                showUploadList={false}
+                                accept="image/*"
+                                beforeUpload={(file) => {
+                                    uploadImageMutation.mutate({ id: editingNews.id, file })
+                                    return false
+                                }}
+                            >
+                                <Button icon={<UploadOutlined />} loading={uploadImageMutation.isPending}>
+                                    Rasm yuklash
+                                </Button>
+                            </Upload>
+                        </div>
+                    </Form.Item>
+                )}
+
                 <Form.Item name="categoryId" label="Kategoriya">
                     <Select placeholder="Tanlang" allowClear>
                         {categoriesData?.data?.map(cat => (

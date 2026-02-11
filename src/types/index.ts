@@ -4,7 +4,7 @@ export interface User {
     name: string
     email: string
     role: 'admin' | 'user'
-    avatar?: string
+    avatar?: string | { url: string; publicId: string }
     bio?: string
     createdAt: string
     updatedAt: string
@@ -295,14 +295,20 @@ export interface DashboardData {
         education: number
         categories: number
         tags: number
+        testimonials: number
+        faqs: number
+        partners: number
+        achievements: number
     }
     alerts: {
         unreadContacts: number
         pendingComments: number
+        pendingConsultations: number
     }
     recent: {
         contacts: Contact[]
         posts: BlogPost[]
+        consultations: Consultation[]
     }
     popular: {
         projects: Project[]

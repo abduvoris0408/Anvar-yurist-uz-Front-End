@@ -81,14 +81,14 @@ const MainLayout = () => {
             icon: <FileTextOutlined />,
             label: 'Kontent',
             children: [
-                { key: '/projects', icon: <ProjectOutlined />, label: 'Loyihalar' },
+                { key: '/projects', icon: <ProjectOutlined />, label: 'Amaliyotlar' },
                 { key: '/blog-posts', icon: <FileTextOutlined />, label: 'Blog Postlar' },
                 { key: '/news', icon: <NotificationOutlined />, label: 'Yangiliklar' },
                 { key: '/testimonials', icon: <StarOutlined />, label: 'Mijoz Fikrlari' },
                 { key: '/faqs', icon: <QuestionCircleOutlined />, label: 'FAQ' },
             ],
         },
-        { key: '/skills', icon: <ToolOutlined />, label: "Ko'nikmalar" },
+        { key: '/skills', icon: <ToolOutlined />, label: 'Ixtisosliklar' },
         { key: '/services', icon: <CustomerServiceOutlined />, label: 'Xizmatlar' },
         {
             key: 'organize',
@@ -269,7 +269,7 @@ const MainLayout = () => {
                                 <Avatar
                                     size={32}
                                     icon={<UserOutlined />}
-                                    src={user?.avatar}
+                                    src={typeof user?.avatar === 'string' ? user?.avatar : user?.avatar?.url}
                                     style={{ backgroundColor: 'var(--primary-light)', color: 'var(--primary-color)' }}
                                 />
                                 <div className="hidden md:flex flex-col">
@@ -354,7 +354,7 @@ const SidebarContent = ({ collapsed, mobileOpen, user, location, menuItems, onMe
                         <Avatar
                             size={32}
                             icon={<UserOutlined />}
-                            src={user?.avatar}
+                            src={typeof user?.avatar === 'string' ? user?.avatar : user?.avatar?.url}
                             style={{
                                 backgroundColor: 'var(--primary-light)',
                                 color: 'var(--primary-color)',

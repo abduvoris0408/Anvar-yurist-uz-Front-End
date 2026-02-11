@@ -26,4 +26,18 @@ export const achievementsApi = {
         const { data } = await api.delete(`/achievements/${id}`)
         return data
     },
+
+    uploadImage: async (id: string, file: File): Promise<ApiResponse<Achievement>> => {
+        const formData = new FormData()
+        formData.append('image', file)
+        const { data } = await api.put(`/achievements/${id}/image`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        })
+        return data
+    },
+
+    deleteImage: async (id: string): Promise<ApiResponse<null>> => {
+        const { data } = await api.delete(`/achievements/${id}/image`)
+        return data
+    },
 }

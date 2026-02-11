@@ -1,8 +1,10 @@
-import { useState, useMemo } from 'react'
-import { Table, Form, Input, InputNumber, Switch, Tag, message, Avatar } from 'antd'
+import { useState } from 'react'
+import { Table, Form, Input, InputNumber, Switch, Tag, message, Avatar, Upload, Button } from 'antd'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { UploadOutlined, DeleteOutlined } from '@ant-design/icons'
 import { partnersApi } from '../api'
 import { PageHeader, CrudDrawer, ActionButtons } from '../components'
+import { useDebounce } from '../hooks/useDebounce'
 import type { Partner } from '../types'
 import type { TableColumnsType } from 'antd'
 
@@ -11,26 +13,19 @@ const { TextArea } = Input
 const PartnersPage = () => {
     const [isDrawerOpen, setIsDrawerOpen] = useState(false)
     const [editingId, setEditingId] = useState<string | null>(null)
+    const [editingPartner, setEditingPartner] = useState<Partner | null>(null)
     const [form] = Form.useForm()
     const queryClient = useQueryClient()
     const [searchText, setSearchText] = useState('')
+    const debouncedSearch = useDebounce(searchText, 500)
 
-    // 1. Data
     const { data, isLoading } = useQuery({
-        queryKey: ['partners'],
-        queryFn: () => partnersApi.getAll(),
+        queryKey: ['partners', debouncedSearch],
+        queryFn: () => partnersApi.getAll({ search: debouncedSearch }),
     })
 
-    const filteredData = useMemo(() => {
-        if (!data?.data) return []
-        if (!searchText) return data.data
-        return data.data.filter((item) =>
-            item.name.toLowerCase().includes(searchText.toLowerCase()) ||
-            item.url?.toLowerCase().includes(searchText.toLowerCase())
-        )
-    }, [data?.data, searchText])
+    const filteredData = data?.data || []
 
-    // 2. Mutations
     const createMutation = useMutation({
         mutationFn: (newPartner: Partial<Partner>) => partnersApi.create(newPartner),
         onSuccess: () => {
@@ -72,15 +67,36 @@ const PartnersPage = () => {
         },
     })
 
-    // 3. Handlers
+    const uploadLogoMutation = useMutation({
+        mutationFn: ({ id, file }: { id: string; file: File }) => partnersApi.uploadLogo(id, file),
+        onSuccess: (response: any) => {
+            message.success('Logo yuklandi!')
+            queryClient.invalidateQueries({ queryKey: ['partners'] })
+            setEditingPartner(prev => prev ? { ...prev, logo: response.data?.logo } as any : prev)
+        },
+        onError: () => message.error('Logo yuklashda xatolik'),
+    })
+
+    const deleteLogoMutation = useMutation({
+        mutationFn: (id: string) => partnersApi.deleteLogo(id),
+        onSuccess: () => {
+            message.success("Logo o'chirildi!")
+            queryClient.invalidateQueries({ queryKey: ['partners'] })
+            setEditingPartner(prev => prev ? { ...prev, logo: undefined } as any : prev)
+        },
+        onError: () => message.error("Logo o'chirishda xatolik"),
+    })
+
     const handleAdd = () => {
         setEditingId(null)
+        setEditingPartner(null)
         form.resetFields()
         setIsDrawerOpen(true)
     }
 
     const handleEdit = (record: Partner) => {
         setEditingId(record.id)
+        setEditingPartner(record)
         form.setFieldsValue(record)
         setIsDrawerOpen(true)
     }
@@ -88,24 +104,35 @@ const PartnersPage = () => {
     const handleClose = () => {
         setIsDrawerOpen(false)
         setEditingId(null)
+        setEditingPartner(null)
         form.resetFields()
     }
 
     const handleSubmit = (values: any) => {
+        const { logo, ...rest } = values
         if (editingId) {
-            updateMutation.mutate({ id: editingId, data: values })
+            updateMutation.mutate({ id: editingId, data: rest })
         } else {
-            createMutation.mutate(values)
+            createMutation.mutate(rest)
         }
     }
 
-    // 4. Columns
+    const getImageUrl = (img: any): string | undefined => {
+        if (!img) return undefined
+        if (typeof img === 'string') return img
+        if (typeof img === 'object' && img.url) return img.url
+        return undefined
+    }
+
     const columns: TableColumnsType<Partner> = [
         {
             title: 'Logo',
             dataIndex: 'logo',
             key: 'logo',
-            render: (logo) => <Avatar src={logo} shape="square" size="large" />,
+            render: (logo) => {
+                const url = getImageUrl(logo)
+                return <Avatar src={url} shape="square" size="large" />
+            },
         },
         {
             title: 'Nomi',
@@ -187,9 +214,36 @@ const PartnersPage = () => {
                     <Input placeholder="https://company.com" />
                 </Form.Item>
 
-                <Form.Item name="logo" label="Logo URL">
-                    <Input placeholder="https://..." />
-                </Form.Item>
+                {/* Logo yuklash — faqat tahrirlashda */}
+                {editingPartner && (
+                    <Form.Item label="Logo">
+                        <div className="space-y-2">
+                            {getImageUrl(editingPartner.logo) && (
+                                <div className="relative inline-block">
+                                    <img src={getImageUrl(editingPartner.logo)} alt="Logo" style={{ width: 80, height: 80, objectFit: 'contain', borderRadius: 8, border: '1px solid #eee' }} />
+                                    <Button
+                                        danger size="small" icon={<DeleteOutlined />}
+                                        onClick={() => deleteLogoMutation.mutate(editingPartner.id)}
+                                        loading={deleteLogoMutation.isPending}
+                                        style={{ position: 'absolute', top: -8, right: -8 }}
+                                    />
+                                </div>
+                            )}
+                            <Upload
+                                showUploadList={false}
+                                accept="image/*"
+                                beforeUpload={(file) => {
+                                    uploadLogoMutation.mutate({ id: editingPartner.id, file })
+                                    return false
+                                }}
+                            >
+                                <Button icon={<UploadOutlined />} loading={uploadLogoMutation.isPending}>
+                                    Logo yuklash
+                                </Button>
+                            </Upload>
+                        </div>
+                    </Form.Item>
+                )}
 
                 <Form.Item name="description" label="Tavsif">
                     <TextArea rows={3} placeholder="Hamkor haqida qisqacha..." />

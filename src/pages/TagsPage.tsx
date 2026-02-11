@@ -141,7 +141,7 @@ const TagsPage = () => {
                     dataSource={tagsData?.data || []}
                     rowKey="id"
                     loading={isLoading}
-                    pagination={{ pageSize: 15 }}
+                    pagination={{ pageSize: 10 }}
                 />
             </Card>
 
@@ -156,7 +156,7 @@ const TagsPage = () => {
                 width={380}
             >
                 <Form.Item name="name" label="Nomi" rules={[{ required: true }]}>
-                    <Input placeholder="JavaScript" />
+                    <Input placeholder="Huquq" />
                 </Form.Item>
                 <Form.Item name="color" label="Rang">
                     <ColorPicker />

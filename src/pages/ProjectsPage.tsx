@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { Table, Form, Input, Select, Switch, Tag, message, Drawer, Button, Upload, Image } from 'antd'
 import { DeleteOutlined, PictureOutlined, UploadOutlined } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -7,12 +7,15 @@ import { PageHeader, CrudDrawer, ActionButtons } from '../components'
 import type { Project, Category } from '../types'
 import type { ColumnsType } from 'antd/es/table'
 
+import { useDebounce } from '../hooks/useDebounce'
+
 const { TextArea } = Input
 
 const ProjectsPage = () => {
     const [isDrawerOpen, setIsDrawerOpen] = useState(false)
     const [editingProject, setEditingProject] = useState<Project | null>(null)
     const [searchText, setSearchText] = useState('')
+    const debouncedSearch = useDebounce(searchText, 500)
     const [form] = Form.useForm()
 
     const queryClient = useQueryClient()
@@ -22,8 +25,8 @@ const ProjectsPage = () => {
     const [selectedProject, setSelectedProject] = useState<Project | null>(null)
 
     const { data: projectsData, isLoading } = useQuery({
-        queryKey: ['projects'],
-        queryFn: () => projectsApi.getAll({ limit: 100 }),
+        queryKey: ['projects', debouncedSearch],
+        queryFn: () => projectsApi.getAll({ limit: 100, search: debouncedSearch }),
     })
 
     const { data: categoriesData } = useQuery({
@@ -31,18 +34,12 @@ const ProjectsPage = () => {
         queryFn: () => categoriesApi.getAll(),
     })
 
-    const filteredData = useMemo(() => {
-        if (!searchText) return projectsData?.data || []
-        return (projectsData?.data || []).filter((item) =>
-            item.title.toLowerCase().includes(searchText.toLowerCase()) ||
-            item.description?.toLowerCase().includes(searchText.toLowerCase())
-        )
-    }, [projectsData?.data, searchText])
+    const filteredData = projectsData?.data || []
 
     const createMutation = useMutation({
         mutationFn: (data: Partial<Project>) => projectsApi.create(data),
         onSuccess: () => {
-            message.success('Loyiha yaratildi!')
+            message.success('Ish yaratildi!')
             queryClient.invalidateQueries({ queryKey: ['projects'] })
             handleCloseDrawer()
         },
@@ -56,7 +53,7 @@ const ProjectsPage = () => {
     const updateMutation = useMutation({
         mutationFn: ({ id, data }: { id: string; data: Partial<Project> }) => projectsApi.update(id, data),
         onSuccess: () => {
-            message.success('Loyiha yangilandi!')
+            message.success('Ish yangilandi!')
             queryClient.invalidateQueries({ queryKey: ['projects'] })
             handleCloseDrawer()
         },
@@ -70,10 +67,30 @@ const ProjectsPage = () => {
     const deleteMutation = useMutation({
         mutationFn: (id: string) => projectsApi.delete(id),
         onSuccess: () => {
-            message.success("Loyiha o'chirildi!")
+            message.success("Ish o'chirildi!")
             queryClient.invalidateQueries({ queryKey: ['projects'] })
         },
         onError: () => message.error('Xatolik yuz berdi'),
+    })
+
+    const uploadImageMutation = useMutation({
+        mutationFn: ({ id, file }: { id: string; file: File }) => projectsApi.uploadImage(id, file),
+        onSuccess: (response: any) => {
+            message.success('Rasm yuklandi!')
+            queryClient.invalidateQueries({ queryKey: ['projects'] })
+            setEditingProject(prev => prev ? { ...prev, image: response.data?.image } as Project : prev)
+        },
+        onError: () => message.error('Rasm yuklashda xatolik'),
+    })
+
+    const deleteImageMutation = useMutation({
+        mutationFn: (id: string) => projectsApi.deleteImage(id),
+        onSuccess: () => {
+            message.success("Rasm o'chirildi!")
+            queryClient.invalidateQueries({ queryKey: ['projects'] })
+            setEditingProject(prev => prev ? { ...prev, image: undefined } : prev)
+        },
+        onError: () => message.error("Rasm o'chirishda xatolik"),
     })
 
     const uploadGalleryMutation = useMutation({
@@ -82,18 +99,20 @@ const ProjectsPage = () => {
             formData.append('image', file)
             return projectsApi.uploadGallery(id, formData)
         },
-        onSuccess: () => {
+        onSuccess: (response: any) => {
             message.success('Rasm yuklandi')
             queryClient.invalidateQueries({ queryKey: ['projects'] })
+            setSelectedProject(prev => prev ? { ...prev, gallery: response.data?.gallery || prev.gallery } as Project : prev)
         },
         onError: () => message.error('Rasm yuklashda xatolik'),
     })
 
     const deleteGalleryMutation = useMutation({
         mutationFn: ({ id, index }: { id: string; index: number }) => projectsApi.deleteGalleryImage(id, index),
-        onSuccess: () => {
+        onSuccess: (_: any, variables: { id: string; index: number }) => {
             message.success('Rasm o\'chirildi')
             queryClient.invalidateQueries({ queryKey: ['projects'] })
+            setSelectedProject(prev => prev ? { ...prev, gallery: (prev.gallery || []).filter((_g, i) => i !== variables.index) } as Project : prev)
         },
         onError: () => message.error('O\'chirishda xatolik'),
     })
@@ -104,7 +123,6 @@ const ProjectsPage = () => {
             form.setFieldsValue({
                 ...project,
                 categoryId: typeof project.category === 'object' ? project.category?.id : project.categoryId,
-                // technologies: project.technologies?.join(', '), // Removed for lawyer context
             })
         } else {
             setEditingProject(null)
@@ -120,12 +138,11 @@ const ProjectsPage = () => {
     }
 
     const handleSubmit = async (values: Record<string, unknown>) => {
+        // image ni payloaddan chiqaramiz
+        const { image, ...rest } = values
         const data = {
-            ...values,
+            ...rest,
             categoryId: values.categoryId,
-            // technologies: typeof values.technologies === 'string'
-            //     ? values.technologies.split(',').map((t: string) => t.trim()).filter(Boolean)
-            //     : values.technologies,
         } as Partial<Project>
 
         if (editingProject) {
@@ -135,7 +152,25 @@ const ProjectsPage = () => {
         }
     }
 
+    // Rasm URL ni olish (JSONB yoki string bo'lishi mumkin)
+    const getImageUrl = (img: any): string | undefined => {
+        if (!img) return undefined
+        if (typeof img === 'string') return img
+        if (typeof img === 'object' && img.url) return img.url
+        return undefined
+    }
+
     const columns: ColumnsType<Project> = [
+        {
+            title: 'Rasm',
+            dataIndex: 'image',
+            key: 'image',
+            width: 60,
+            render: (img) => {
+                const url = getImageUrl(img)
+                return url ? <img src={url} alt="" style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 6 }} /> : '-'
+            },
+        },
         {
             title: 'Nomi',
             dataIndex: 'title',
@@ -233,10 +268,10 @@ const ProjectsPage = () => {
                 width={500}
             >
                 <Form.Item name="title" label="Nomi" rules={[{ required: true }]}>
-                    <Input placeholder="Loyiha nomi" />
+                    <Input placeholder="Ish nomi" />
                 </Form.Item>
                 <Form.Item name="description" label="Tavsif" rules={[{ required: true }]}>
-                    <TextArea rows={3} placeholder="Loyiha tavsifi" />
+                    <TextArea rows={3} placeholder="Ish tavsifi" />
                 </Form.Item>
                 <Form.Item name="categoryId" label="Kategoriya" rules={[{ required: true, message: 'Kategoriyani tanlang' }]}>
                     <Select placeholder="Kategoriya tanlang">
@@ -245,21 +280,38 @@ const ProjectsPage = () => {
                         ))}
                     </Select>
                 </Form.Item>
-                <Form.Item name="image" label="Rasm URL">
-                    <Input placeholder="https://..." onChange={(e) => {
-                        form.setFieldsValue({ image: e.target.value })
-                    }} />
-                </Form.Item>
-                <Form.Item shouldUpdate={(prev, current) => prev.image !== current.image}>
-                    {() => {
-                        const img = form.getFieldValue('image')
-                        return img ? (
-                            <div className="mt-2">
-                                <img src={img} alt="Preview" className="w-full h-48 object-cover rounded-lg" />
-                            </div>
-                        ) : null
-                    }}
-                </Form.Item>
+
+                {/* Rasm yuklash — faqat tahrirlashda */}
+                {editingProject && (
+                    <Form.Item label="Rasm">
+                        <div className="space-y-2">
+                            {getImageUrl(editingProject.image) && (
+                                <div className="relative">
+                                    <img src={getImageUrl(editingProject.image)} alt="Preview" style={{ width: '100%', height: 160, objectFit: 'cover', borderRadius: 8 }} />
+                                    <Button
+                                        danger size="small" icon={<DeleteOutlined />}
+                                        onClick={() => deleteImageMutation.mutate(editingProject.id)}
+                                        loading={deleteImageMutation.isPending}
+                                        style={{ position: 'absolute', top: 8, right: 8 }}
+                                    />
+                                </div>
+                            )}
+                            <Upload
+                                showUploadList={false}
+                                accept="image/*"
+                                beforeUpload={(file) => {
+                                    uploadImageMutation.mutate({ id: editingProject.id, file })
+                                    return false
+                                }}
+                            >
+                                <Button icon={<UploadOutlined />} loading={uploadImageMutation.isPending}>
+                                    Rasm yuklash
+                                </Button>
+                            </Upload>
+                        </div>
+                    </Form.Item>
+                )}
+
                 <Form.Item name="status" label="Status" initialValue="published">
                     <Select>
                         <Select.Option value="draft">Draft</Select.Option>
@@ -296,30 +348,33 @@ const ProjectsPage = () => {
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                    {selectedProject?.gallery?.map((url, index) => (
-                        <div key={index} className="relative group border rounded-lg overflow-hidden">
-                            <Image
-                                src={url}
-                                alt={`Gallery ${index}`}
-                                className="object-cover w-full h-40"
-                                width="100%"
-                                height={160}
-                            />
-                            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <Button
-                                    danger
-                                    size="small"
-                                    icon={<DeleteOutlined />}
-                                    onClick={() => {
-                                        if (selectedProject) {
-                                            deleteGalleryMutation.mutate({ id: selectedProject.id, index })
-                                        }
-                                    }}
-                                    loading={deleteGalleryMutation.isPending}
+                    {selectedProject?.gallery?.map((img, index) => {
+                        const url = getImageUrl(img)
+                        return url ? (
+                            <div key={index} className="relative group border rounded-lg overflow-hidden">
+                                <Image
+                                    src={url}
+                                    alt={`Gallery ${index}`}
+                                    className="object-cover w-full h-40"
+                                    width="100%"
+                                    height={160}
                                 />
+                                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Button
+                                        danger
+                                        size="small"
+                                        icon={<DeleteOutlined />}
+                                        onClick={() => {
+                                            if (selectedProject) {
+                                                deleteGalleryMutation.mutate({ id: selectedProject.id, index })
+                                            }
+                                        }}
+                                        loading={deleteGalleryMutation.isPending}
+                                    />
+                                </div>
                             </div>
-                        </div>
-                    ))}
+                        ) : null
+                    })}
                     {(!selectedProject?.gallery || selectedProject.gallery.length === 0) && (
                         <div className="col-span-2 text-center py-8 text-gray-400 border-dashed border-2 rounded-lg">
                             Rasmlar yo'q

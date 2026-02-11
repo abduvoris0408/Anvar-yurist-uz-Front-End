@@ -5,8 +5,8 @@ import { Link, useLocation } from 'react-router-dom'
 const routeLabels: Record<string, string> = {
     '': 'Dashboard',
     'about': 'Men haqimda',
-    'projects': 'Loyihalar',
-    'skills': "Ko'nikmalar",
+    'projects': 'Amaliyotlar',
+    'skills': 'Ixtisosliklar',
     'services': 'Xizmatlar',
     'categories': 'Kategoriyalar',
     'tags': 'Teglar',

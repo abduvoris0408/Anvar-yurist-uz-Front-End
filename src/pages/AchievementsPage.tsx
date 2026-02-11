@@ -1,37 +1,30 @@
-import { useState, useMemo } from 'react'
-import { Table, Form, Input, InputNumber, Switch, Tag, message, Select, DatePicker } from 'antd'
-import dayjs from 'dayjs'
+import { useState } from 'react'
+import { Table, Form, Input, DatePicker, Tag, InputNumber, message, Upload, Button } from 'antd'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { UploadOutlined, DeleteOutlined } from '@ant-design/icons'
 import { achievementsApi } from '../api'
 import { PageHeader, CrudDrawer, ActionButtons } from '../components'
+import { useDebounce } from '../hooks/useDebounce'
 import type { Achievement } from '../types'
 import type { TableColumnsType } from 'antd'
-
-const { TextArea } = Input
+import dayjs from 'dayjs'
 
 const AchievementsPage = () => {
     const [isDrawerOpen, setIsDrawerOpen] = useState(false)
     const [editingId, setEditingId] = useState<string | null>(null)
+    const [editingAchievement, setEditingAchievement] = useState<Achievement | null>(null)
     const [form] = Form.useForm()
     const queryClient = useQueryClient()
     const [searchText, setSearchText] = useState('')
+    const debouncedSearch = useDebounce(searchText, 500)
 
-    // 1. Data
     const { data, isLoading } = useQuery({
-        queryKey: ['achievements'],
-        queryFn: () => achievementsApi.getAll(),
+        queryKey: ['achievements', debouncedSearch],
+        queryFn: () => achievementsApi.getAll({ search: debouncedSearch }),
     })
 
-    const filteredData = useMemo(() => {
-        if (!data?.data) return []
-        if (!searchText) return data.data
-        return data.data.filter((item) =>
-            item.title.toLowerCase().includes(searchText.toLowerCase()) ||
-            item.issuer?.toLowerCase().includes(searchText.toLowerCase())
-        )
-    }, [data?.data, searchText])
+    const filteredData = data?.data || []
 
-    // 2. Mutations
     const createMutation = useMutation({
         mutationFn: (newAchievement: Partial<Achievement>) => achievementsApi.create(newAchievement),
         onSuccess: () => {
@@ -40,7 +33,9 @@ const AchievementsPage = () => {
             handleClose()
         },
         onError: (error: any) => {
-            message.error(error.response?.data?.error || error.message || 'Xatolik yuz berdi')
+            console.error('Create Achievement Error:', error)
+            const errMsg = error.response?.data?.error || error.response?.data?.message || error.message || 'Noma\'lum xatolik'
+            message.error(errMsg)
         },
     })
 
@@ -52,7 +47,9 @@ const AchievementsPage = () => {
             handleClose()
         },
         onError: (error: any) => {
-            message.error(error.response?.data?.error || error.message || 'Xatolik yuz berdi')
+            console.error('Update Achievement Error:', error)
+            const errMsg = error.response?.data?.error || error.response?.data?.message || error.message || 'Noma\'lum xatolik'
+            message.error(errMsg)
         },
     })
 
@@ -62,18 +59,43 @@ const AchievementsPage = () => {
             message.success('Yutuq o\'chirildi')
             queryClient.invalidateQueries({ queryKey: ['achievements'] })
         },
-        onError: () => message.error('Xatolik yuz berdi'),
+        onError: (error: any) => {
+            console.error('Delete Achievement Error:', error)
+            const errMsg = error.response?.data?.error || error.response?.data?.message || error.message || 'Noma\'lum xatolik'
+            message.error(errMsg)
+        },
     })
 
-    // 3. Handlers
+    const uploadImageMutation = useMutation({
+        mutationFn: ({ id, file }: { id: string; file: File }) => achievementsApi.uploadImage(id, file),
+        onSuccess: (response: any) => {
+            message.success('Rasm yuklandi!')
+            queryClient.invalidateQueries({ queryKey: ['achievements'] })
+            setEditingAchievement(prev => prev ? { ...prev, image: response.data?.image } as any : prev)
+        },
+        onError: () => message.error('Rasm yuklashda xatolik'),
+    })
+
+    const deleteImageMutation = useMutation({
+        mutationFn: (id: string) => achievementsApi.deleteImage(id),
+        onSuccess: () => {
+            message.success("Rasm o'chirildi!")
+            queryClient.invalidateQueries({ queryKey: ['achievements'] })
+            setEditingAchievement(prev => prev ? { ...prev, image: undefined } as any : prev)
+        },
+        onError: () => message.error("Rasm o'chirishda xatolik"),
+    })
+
     const handleAdd = () => {
         setEditingId(null)
+        setEditingAchievement(null)
         form.resetFields()
         setIsDrawerOpen(true)
     }
 
     const handleEdit = (record: Achievement) => {
         setEditingId(record.id)
+        setEditingAchievement(record)
         form.setFieldsValue({
             ...record,
             date: record.date ? dayjs(record.date) : null,
@@ -84,58 +106,56 @@ const AchievementsPage = () => {
     const handleClose = () => {
         setIsDrawerOpen(false)
         setEditingId(null)
+        setEditingAchievement(null)
         form.resetFields()
     }
 
     const handleSubmit = (values: any) => {
-        const formattedValues = {
-            ...values,
-            date: values.date ? values.date.format('YYYY-MM-DD') : null,
+        const { image, ...rest } = values
+        const data = {
+            ...rest,
+            date: rest.date ? rest.date.format('YYYY-MM-DD') : undefined,
         }
         if (editingId) {
-            updateMutation.mutate({ id: editingId, data: formattedValues })
+            updateMutation.mutate({ id: editingId, data })
         } else {
-            createMutation.mutate(formattedValues)
+            createMutation.mutate(data)
         }
     }
 
-    // 4. Columns
+    const getImageUrl = (img: any): string | undefined => {
+        if (!img) return undefined
+        if (typeof img === 'string') return img
+        if (typeof img === 'object' && img.url) return img.url
+        return undefined
+    }
+
     const columns: TableColumnsType<Achievement> = [
         {
-            title: 'Nomi',
-            dataIndex: 'title',
-            key: 'title',
-            render: (text, record) => (
-                <div>
-                    <div className="font-medium">{text}</div>
-                    <div className="text-xs text-gray-500">{record.issuer}</div>
-                </div>
-            ),
-        },
-        {
-            title: 'Turi',
-            dataIndex: 'type',
-            key: 'type',
-            render: (type) => {
-                const colors: Record<string, string> = {
-                    license: 'blue',
-                    certificate: 'green',
-                    award: 'gold',
-                    membership: 'purple',
-                }
-                const labels: Record<string, string> = {
-                    license: 'Litsenziya',
-                    certificate: 'Sertifikat',
-                    award: 'Mukofot',
-                    membership: 'A\'zolik',
-                }
-                return <Tag color={colors[type] || 'default'}>{labels[type] || type}</Tag>
+            title: 'Rasm',
+            dataIndex: 'image',
+            key: 'image',
+            width: 60,
+            render: (img) => {
+                const url = getImageUrl(img)
+                return url ? <img src={url} alt="" style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 6 }} /> : '-'
             },
         },
         {
-            title: 'Sanasi',
+            title: 'Yutuq',
+            dataIndex: 'title',
+            key: 'title',
+        },
+        {
+            title: 'Beruvchi',
+            dataIndex: 'issuer',
+            key: 'issuer',
+        },
+        {
+            title: 'Sana',
             dataIndex: 'date',
             key: 'date',
+            render: (date) => date ? dayjs(date).format('DD.MM.YYYY') : '-',
         },
         {
             title: 'Holat',
@@ -164,11 +184,11 @@ const AchievementsPage = () => {
     return (
         <>
             <PageHeader
-                title="Yutuqlar va Sertifikatlar"
+                title="Yutuqlar"
                 onAdd={handleAdd}
                 addButtonText="Yangi yutuq"
                 onSearch={setSearchText}
-                searchPlaceholder="Nomi yoki tashkilot bo'yicha qidirish..."
+                searchPlaceholder="Yutuq nomi bo'yicha qidirish..."
             >
                 <Table
                     columns={columns}
@@ -180,7 +200,7 @@ const AchievementsPage = () => {
             </PageHeader>
 
             <CrudDrawer
-                title={editingId ? 'Yutuqni tahrirlash' : 'Yangi yutuq qo\'shish'}
+                title={editingId ? 'Yutuqni tahrirlash' : 'Yangi yutuq'}
                 open={isDrawerOpen}
                 onClose={handleClose}
                 loading={createMutation.isPending || updateMutation.isPending}
@@ -190,69 +210,56 @@ const AchievementsPage = () => {
             >
                 <Form.Item
                     name="title"
-                    label="Nomi"
-                    rules={[{ required: true, message: 'Yutuq nomini kiriting' }]}
+                    label="Yutuq nomi"
+                    rules={[{ required: true, message: 'Nomini kiriting' }]}
                 >
-                    <Input placeholder="Sertifikat nomi / Mukofot nomi" />
+                    <Input placeholder="Eng yaxshi himoya" />
+                </Form.Item>
+                <Form.Item name="description" label="Tavsif">
+                    <Input.TextArea rows={3} placeholder="Yutuq tavsifi" />
                 </Form.Item>
 
-                <Form.Item name="issuer" label="Beruvchi Tashkilot">
-                    <Input placeholder="Google, Coursera, Adliya vazirligi..." />
+                <Form.Item name="issuer" label="Beruvchi tashkilot">
+                    <Input placeholder="Yuristlar palatasi" />
                 </Form.Item>
 
-                <Form.Item
-                    name="type"
-                    label="Turi"
-                    rules={[{ required: true, message: 'Turni tanlang' }]}
-                    initialValue="certificate"
-                >
-                    <Select>
-                        <Select.Option value="license">Litsenziya</Select.Option>
-                        <Select.Option value="certificate">Sertifikat</Select.Option>
-                        <Select.Option value="award">Mukofot</Select.Option>
-                        <Select.Option value="membership">A'zolik</Select.Option>
-                    </Select>
-                </Form.Item>
-
-                <Form.Item name="date" label="Sanasi">
+                <Form.Item name="date" label="Sana">
                     <DatePicker className="w-full" format="YYYY-MM-DD" />
                 </Form.Item>
 
-                <Form.Item name="image" label="Rasm/Hujjat URL">
-                    <Input placeholder="https://..." onChange={(e) => {
-                        form.setFieldsValue({ image: e.target.value })
-                    }} />
-                </Form.Item>
-                <Form.Item shouldUpdate={(prev, current) => prev.image !== current.image}>
-                    {() => {
-                        const img = form.getFieldValue('image')
-                        return img ? (
-                            <div className="mt-2">
-                                <img src={img} alt="Preview" className="w-full h-48 object-cover rounded-lg" />
-                            </div>
-                        ) : null
-                    }}
-                </Form.Item>
+                {/* Rasm yuklash — faqat tahrirlashda */}
+                {editingAchievement && (
+                    <Form.Item label="Rasm/Hujjat">
+                        <div className="space-y-2">
+                            {getImageUrl(editingAchievement.image) && (
+                                <div className="relative">
+                                    <img src={getImageUrl(editingAchievement.image)} alt="Preview" style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 8 }} />
+                                    <Button
+                                        danger size="small" icon={<DeleteOutlined />}
+                                        onClick={() => deleteImageMutation.mutate(editingAchievement.id)}
+                                        loading={deleteImageMutation.isPending}
+                                        style={{ position: 'absolute', top: 8, right: 8 }}
+                                    />
+                                </div>
+                            )}
+                            <Upload
+                                showUploadList={false}
+                                accept="image/*"
+                                beforeUpload={(file) => {
+                                    uploadImageMutation.mutate({ id: editingAchievement.id, file })
+                                    return false
+                                }}
+                            >
+                                <Button icon={<UploadOutlined />} loading={uploadImageMutation.isPending}>
+                                    Rasm yuklash
+                                </Button>
+                            </Upload>
+                        </div>
+                    </Form.Item>
+                )}
 
-                <Form.Item name="description" label="Tavsif">
-                    <TextArea rows={3} placeholder="Qisqacha ma'lumot..." />
-                </Form.Item>
-
-                <Form.Item
-                    name="order"
-                    label="Tartib raqami"
-                    initialValue={1}
-                >
+                <Form.Item name="order" label="Tartib raqami" initialValue={1}>
                     <InputNumber min={1} className="w-full" />
-                </Form.Item>
-
-                <Form.Item
-                    name="isActive"
-                    label="Holati"
-                    valuePropName="checked"
-                    initialValue={true}
-                >
-                    <Switch checkedChildren="Faol" unCheckedChildren="Nofaol" />
                 </Form.Item>
             </CrudDrawer>
         </>

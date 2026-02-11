@@ -30,6 +30,22 @@ export const authApi = {
         return data
     },
 
+    uploadAvatar: async (file: File): Promise<ApiResponse<{ url: string; publicId: string }>> => {
+        const formData = new FormData()
+        formData.append('avatar', file)
+        const { data } = await api.put('/auth/avatar', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        })
+        return data
+    },
+
+    deleteAvatar: async (): Promise<ApiResponse<void>> => {
+        const { data } = await api.delete('/auth/avatar')
+        return data
+    },
+
     updateDetails: async (userData: Partial<User>): Promise<ApiResponse<User>> => {
         const { data } = await api.put('/auth/update-details', userData)
         return data

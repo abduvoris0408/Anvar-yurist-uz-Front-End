@@ -1,39 +1,34 @@
-import { useState, useMemo } from 'react'
-import { Table, Form, Input, ColorPicker, Tag, message, Select } from 'antd'
+import { useState } from 'react'
+import { Table, Form, Input, ColorPicker, Tag, message, Upload, Button } from 'antd'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { UploadOutlined, DeleteOutlined } from '@ant-design/icons'
 import { categoriesApi } from '../api'
 import { PageHeader, CrudDrawer, ActionButtons } from '../components'
+import { useDebounce } from '../hooks/useDebounce'
 import type { Category } from '../types'
-import type { TableColumnsType } from 'antd'
-
-const { TextArea } = Input
 
 const CategoriesPage = () => {
     const [isDrawerOpen, setIsDrawerOpen] = useState(false)
+    const [editingId, setEditingId] = useState<string | null>(null)
     const [editingCategory, setEditingCategory] = useState<Category | null>(null)
-    const [searchText, setSearchText] = useState('')
     const [form] = Form.useForm()
     const queryClient = useQueryClient()
+    const [searchText, setSearchText] = useState('')
+    const debouncedSearch = useDebounce(searchText, 500)
 
-    const { data: categoriesData, isLoading } = useQuery({
-        queryKey: ['categories'],
-        queryFn: () => categoriesApi.getAll({ limit: 100 }),
+    const { data, isLoading } = useQuery({
+        queryKey: ['categories', debouncedSearch],
+        queryFn: () => categoriesApi.getAll({ search: debouncedSearch }),
     })
 
-    const filteredData = useMemo(() => {
-        if (!searchText) return categoriesData?.data || []
-        return (categoriesData?.data || []).filter((item) =>
-            item.name.toLowerCase().includes(searchText.toLowerCase()) ||
-            item.description?.toLowerCase().includes(searchText.toLowerCase())
-        )
-    }, [categoriesData?.data, searchText])
+    const filteredData = data?.data || []
 
     const createMutation = useMutation({
-        mutationFn: (data: Partial<Category>) => categoriesApi.create(data),
+        mutationFn: (newCategory: Partial<Category>) => categoriesApi.create(newCategory),
         onSuccess: () => {
-            message.success('Kategoriya yaratildi!')
+            message.success('Kategoriya yaratildi')
             queryClient.invalidateQueries({ queryKey: ['categories'] })
-            handleCloseDrawer()
+            handleClose()
         },
         onError: (error: any) => {
             console.error('Create Category Error:', error)
@@ -45,9 +40,9 @@ const CategoriesPage = () => {
     const updateMutation = useMutation({
         mutationFn: ({ id, data }: { id: string; data: Partial<Category> }) => categoriesApi.update(id, data),
         onSuccess: () => {
-            message.success('Kategoriya yangilandi!')
+            message.success('Kategoriya yangilandi')
             queryClient.invalidateQueries({ queryKey: ['categories'] })
-            handleCloseDrawer()
+            handleClose()
         },
         onError: (error: any) => {
             console.error('Update Category Error:', error)
@@ -59,7 +54,7 @@ const CategoriesPage = () => {
     const deleteMutation = useMutation({
         mutationFn: (id: string) => categoriesApi.delete(id),
         onSuccess: () => {
-            message.success("Kategoriya o'chirildi!")
+            message.success('Kategoriya o\'chirildi')
             queryClient.invalidateQueries({ queryKey: ['categories'] })
         },
         onError: (error: any) => {
@@ -69,71 +64,97 @@ const CategoriesPage = () => {
         },
     })
 
-    const handleOpenDrawer = (category?: Category) => {
-        if (category) {
-            setEditingCategory(category)
-            form.setFieldsValue(category)
-        } else {
-            setEditingCategory(null)
-            form.resetFields()
-        }
+    const uploadImageMutation = useMutation({
+        mutationFn: ({ id, file }: { id: string; file: File }) => categoriesApi.uploadImage(id, file),
+        onSuccess: (response: any) => {
+            message.success('Rasm yuklandi!')
+            queryClient.invalidateQueries({ queryKey: ['categories'] })
+            setEditingCategory(prev => prev ? { ...prev, image: response.data?.image } as Category : prev)
+        },
+        onError: () => message.error('Rasm yuklashda xatolik'),
+    })
+
+    const deleteImageMutation = useMutation({
+        mutationFn: (id: string) => categoriesApi.deleteImage(id),
+        onSuccess: () => {
+            message.success("Rasm o'chirildi!")
+            queryClient.invalidateQueries({ queryKey: ['categories'] })
+            setEditingCategory(prev => prev ? { ...prev, image: undefined } : prev)
+        },
+        onError: () => message.error("Rasm o'chirishda xatolik"),
+    })
+
+    const handleAdd = () => {
+        setEditingId(null)
+        setEditingCategory(null)
+        form.resetFields()
         setIsDrawerOpen(true)
     }
 
-    const handleCloseDrawer = () => {
+    const handleEdit = (record: Category) => {
+        setEditingId(record.id)
+        setEditingCategory(record)
+        form.setFieldsValue(record)
+        setIsDrawerOpen(true)
+    }
+
+    const handleClose = () => {
         setIsDrawerOpen(false)
+        setEditingId(null)
         setEditingCategory(null)
         form.resetFields()
     }
 
-    const handleSubmit = async (values: Record<string, unknown>) => {
-        const data = {
-            ...values,
-            color: (values.color && typeof values.color === 'object') ? (values.color as any).toHexString() : values.color,
-        } as Partial<Category>
-
-        if (editingCategory) {
-            updateMutation.mutate({ id: editingCategory.id, data })
+    const handleSubmit = (values: any) => {
+        const { image, ...rest } = values
+        const finalData = {
+            ...rest,
+            color: typeof rest.color === 'object' && rest.color?.toHexString ? rest.color.toHexString() : rest.color,
+        }
+        if (editingId) {
+            updateMutation.mutate({ id: editingId, data: finalData })
         } else {
-            createMutation.mutate(data)
+            createMutation.mutate(finalData)
         }
     }
 
-    const columns: TableColumnsType<Category> = [
+    const getImageUrl = (img: any): string | undefined => {
+        if (!img) return undefined
+        if (typeof img === 'string') return img
+        if (typeof img === 'object' && img.url) return img.url
+        return undefined
+    }
+
+    const columns = [
+        {
+            title: 'Rang',
+            dataIndex: 'color',
+            key: 'color',
+            width: 60,
+            render: (color: string) => (
+                <div style={{ width: 24, height: 24, borderRadius: '50%', background: color || '#ccc' }} />
+            ),
+        },
         {
             title: 'Nomi',
             dataIndex: 'name',
             key: 'name',
-            sorter: (a, b) => a.name.localeCompare(b.name),
-            render: (text, record) => (
+            render: (text: string, record: Category) => (
                 <Tag color={record.color}>{text}</Tag>
             ),
         },
         {
             title: 'Slug',
             dataIndex: 'slug',
-            key: 'slug'
-        },
-        {
-            title: 'Tavsif',
-            dataIndex: 'description',
-            key: 'description',
-            ellipsis: true
-        },
-        {
-            title: 'Loyihalar',
-            dataIndex: 'projectCount',
-            key: 'projectCount',
-            render: (c) => c || 0,
-            sorter: (a, b) => (a.projectCount || 0) - (b.projectCount || 0),
+            key: 'slug',
         },
         {
             title: 'Amallar',
             key: 'actions',
             width: 100,
-            render: (_, record) => (
+            render: (_: unknown, record: Category) => (
                 <ActionButtons
-                    onEdit={() => handleOpenDrawer(record)}
+                    onEdit={() => handleEdit(record)}
                     onDelete={() => deleteMutation.mutate(record.id)}
                     deleteLoading={deleteMutation.isPending}
                 />
@@ -145,51 +166,76 @@ const CategoriesPage = () => {
         <>
             <PageHeader
                 title="Kategoriyalar"
-                onAdd={() => handleOpenDrawer()}
+                onAdd={handleAdd}
                 addButtonText="Yangi kategoriya"
                 onSearch={setSearchText}
-                searchPlaceholder="Kategoriyalarni qidirish..."
+                searchPlaceholder="Kategoriya nomi bo'yicha qidirish..."
             >
                 <Table
                     columns={columns}
                     dataSource={filteredData}
                     rowKey="id"
                     loading={isLoading}
-                    pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (total) => `Jami: ${total}` }}
-                    size="middle"
+                    pagination={{ pageSize: 10 }}
                 />
             </PageHeader>
 
             <CrudDrawer
+                title={editingId ? 'Kategoriyani tahrirlash' : 'Yangi kategoriya'}
                 open={isDrawerOpen}
-                onClose={handleCloseDrawer}
-                title={editingCategory ? 'Kategoriyani tahrirlash' : 'Yangi kategoriya'}
+                onClose={handleClose}
                 loading={createMutation.isPending || updateMutation.isPending}
                 form={form}
                 onSubmit={handleSubmit}
-                isEdit={!!editingCategory}
+                isEdit={!!editingId}
             >
-                <Form.Item name="name" label="Nomi" rules={[{ required: true }]}>
-                    <Input placeholder="Web Development" />
-                </Form.Item>
-                <Form.Item name="type" label="Turi" rules={[{ required: true, message: 'Kategoriya turini tanlang' }]}>
-                    <Select placeholder="Turini tanlang">
-                        <Select.Option value="project">Loyiha</Select.Option>
-                        <Select.Option value="blog">Blog</Select.Option>
-                        <Select.Option value="service">Xizmat</Select.Option>
-                        <Select.Option value="skill">Ko'nikma</Select.Option>
-                        <Select.Option value="news">Yangilik</Select.Option>
-                    </Select>
+                <Form.Item
+                    name="name"
+                    label="Kategoriya nomi"
+                    rules={[{ required: true, message: 'Nomini kiriting' }]}
+                >
+                    <Input placeholder="Huquq sohasi" />
                 </Form.Item>
                 <Form.Item name="description" label="Tavsif">
-                    <TextArea rows={3} placeholder="Kategoriya tavsifi" />
+                    <Input.TextArea rows={2} placeholder="Kategoriya tavsifi" />
                 </Form.Item>
-                <Form.Item name="icon" label="Icon (URL)">
-                    <Input placeholder="https://example.com/icon.svg" />
+                <Form.Item name="color" label="Rang">
+                    <ColorPicker format="hex" />
                 </Form.Item>
-                <Form.Item name="color" label="Rang" initialValue="#3B82F6">
-                    <ColorPicker showText />
+                <Form.Item name="icon" label="Icon (emoji yoki CSS class)">
+                    <Input placeholder="🌐 yoki fa-globe" />
                 </Form.Item>
+
+                {/* Rasm yuklash — faqat tahrirlashda */}
+                {editingCategory && (
+                    <Form.Item label="Rasm">
+                        <div className="space-y-2">
+                            {getImageUrl(editingCategory.image) && (
+                                <div className="relative">
+                                    <img src={getImageUrl(editingCategory.image)} alt="Preview" style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 8 }} />
+                                    <Button
+                                        danger size="small" icon={<DeleteOutlined />}
+                                        onClick={() => deleteImageMutation.mutate(editingCategory.id)}
+                                        loading={deleteImageMutation.isPending}
+                                        style={{ position: 'absolute', top: 8, right: 8 }}
+                                    />
+                                </div>
+                            )}
+                            <Upload
+                                showUploadList={false}
+                                accept="image/*"
+                                beforeUpload={(file) => {
+                                    uploadImageMutation.mutate({ id: editingCategory.id, file })
+                                    return false
+                                }}
+                            >
+                                <Button icon={<UploadOutlined />} loading={uploadImageMutation.isPending}>
+                                    Rasm yuklash
+                                </Button>
+                            </Upload>
+                        </div>
+                    </Form.Item>
+                )}
             </CrudDrawer>
         </>
     )

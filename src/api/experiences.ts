@@ -26,4 +26,18 @@ export const experiencesApi = {
         const { data } = await api.delete(`/experiences/${id}`)
         return data
     },
+
+    uploadLogo: async (id: string, file: File): Promise<ApiResponse<Experience>> => {
+        const formData = new FormData()
+        formData.append('logo', file)
+        const { data } = await api.put(`/experiences/${id}/logo`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        })
+        return data
+    },
+
+    deleteLogo: async (id: string): Promise<ApiResponse<null>> => {
+        const { data } = await api.delete(`/experiences/${id}/logo`)
+        return data
+    },
 }

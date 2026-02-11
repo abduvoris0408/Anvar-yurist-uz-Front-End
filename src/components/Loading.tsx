@@ -10,14 +10,19 @@ const Loading = ({ isFull = false, tip = 'Yuklanmoqda...' }: LoadingProps) => {
     if (isFull) {
         return (
             <div style={{
-                minHeight: '100vh',
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                background: 'var(--bg-primary, #f5f5f5)',
+                background: 'var(--bg-primary)',
+                zIndex: 9999,
             }}>
                 <Spin
-                    indicator={<LoadingOutlined style={{ fontSize: 36 }} spin />}
+                    indicator={<LoadingOutlined style={{ fontSize: 40 }} spin />}
                     tip={tip}
                     size="large"
                 >
@@ -33,6 +38,9 @@ const Loading = ({ isFull = false, tip = 'Yuklanmoqda...' }: LoadingProps) => {
             alignItems: 'center',
             justifyContent: 'center',
             padding: '60px 0',
+            width: '100%',
+            height: '100%',
+            minHeight: '200px'
         }}>
             <Spin
                 indicator={<LoadingOutlined style={{ fontSize: 28 }} spin />}

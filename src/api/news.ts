@@ -31,4 +31,18 @@ export const newsApi = {
         const { data } = await api.delete(`/news/${id}`)
         return data
     },
+
+    uploadImage: async (id: string, file: File): Promise<ApiResponse<News>> => {
+        const formData = new FormData()
+        formData.append('image', file)
+        const { data } = await api.put(`/news/${id}/image`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        })
+        return data
+    },
+
+    deleteImage: async (id: string): Promise<ApiResponse<null>> => {
+        const { data } = await api.delete(`/news/${id}/image`)
+        return data
+    },
 }

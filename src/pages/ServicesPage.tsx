@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { Table, Form, Input, Select, Switch, InputNumber, Space, Tag, message, Card, Button, Popconfirm, Drawer } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined, UnorderedListOutlined } from '@ant-design/icons'
+import { Table, Form, Input, Select, Switch, InputNumber, Space, Tag, message, Card, Button, Popconfirm, Drawer, Upload } from 'antd'
+import { PlusOutlined, EditOutlined, DeleteOutlined, UnorderedListOutlined, UploadOutlined } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { servicesApi, categoriesApi } from '../api'
 import { PageHeader, CrudDrawer } from '../components'
+import { useDebounce } from '../hooks/useDebounce'
 import type { Service, ServiceDetail } from '../types'
 
 const ServicesPage = () => {
@@ -16,10 +17,12 @@ const ServicesPage = () => {
     const [detailDrawerOpen, setDetailDrawerOpen] = useState(false)
     const [selectedService, setSelectedService] = useState<Service | null>(null)
     const [editingDetail, setEditingDetail] = useState<ServiceDetail | null>(null)
+    const [searchText, setSearchText] = useState('')
+    const debouncedSearch = useDebounce(searchText, 500)
 
     const { data: servicesData, isLoading } = useQuery({
-        queryKey: ['services'],
-        queryFn: () => servicesApi.getAll(),
+        queryKey: ['services', debouncedSearch],
+        queryFn: () => servicesApi.getAll({ search: debouncedSearch }),
     })
 
     const { data: categoriesData } = useQuery({
@@ -77,6 +80,26 @@ const ServicesPage = () => {
         },
     })
 
+    const uploadImageMutation = useMutation({
+        mutationFn: ({ id, file }: { id: string; file: File }) => servicesApi.uploadImage(id, file),
+        onSuccess: (response: any) => {
+            message.success('Rasm yuklandi!')
+            queryClient.invalidateQueries({ queryKey: ['services'] })
+            setEditingService(prev => prev ? { ...prev, image: response.data?.image } as Service : prev)
+        },
+        onError: () => message.error('Rasm yuklashda xatolik'),
+    })
+
+    const deleteImageMutation = useMutation({
+        mutationFn: (id: string) => servicesApi.deleteImage(id),
+        onSuccess: () => {
+            message.success("Rasm o'chirildi!")
+            queryClient.invalidateQueries({ queryKey: ['services'] })
+            setEditingService(prev => prev ? { ...prev, image: undefined } : prev)
+        },
+        onError: () => message.error("Rasm o'chirishda xatolik"),
+    })
+
     // Detail mutations
     const createDetailMutation = useMutation({
         mutationFn: (values: Partial<ServiceDetail>) => servicesApi.createDetail(values),
@@ -122,22 +145,27 @@ const ServicesPage = () => {
         },
     })
 
+    const getImageUrl = (img: any): string | undefined => {
+        if (!img) return undefined
+        if (typeof img === 'string') return img
+        if (typeof img === 'object' && img.url) return img.url
+        return undefined
+    }
+
     const handleSubmit = (values: Record<string, unknown>) => {
+        const { image, ...rest } = values
         if (editingService) {
-            updateMutation.mutate({ id: editingService.id, values })
+            updateMutation.mutate({ id: editingService.id, values: rest })
         } else {
-            createMutation.mutate(values)
+            createMutation.mutate(rest)
         }
     }
 
     const handleDetailSubmit = (values: Record<string, unknown>) => {
-        console.log('Selected Service for Detail:', selectedService)
-        console.log('Form Values:', values)
         if (editingDetail) {
             updateDetailMutation.mutate({ id: editingDetail.id, values })
         } else {
             const serviceId = selectedService?.id
-            console.log('Sending Service ID:', serviceId)
             createDetailMutation.mutate({ ...values, serviceId: serviceId })
         }
     }
@@ -217,6 +245,8 @@ const ServicesPage = () => {
                         Yangi xizmat
                     </Button>
                 }
+                onSearch={setSearchText}
+                searchPlaceholder="Xizmat nomi bo'yicha qidirish..."
             />
 
             <Card>
@@ -239,17 +269,46 @@ const ServicesPage = () => {
                 isEdit={!!editingService}
             >
                 <Form.Item name="title" label="Nomi" rules={[{ required: true }]}>
-                    <Input placeholder="Web Development" />
+                    <Input placeholder="Huquqiy maslahat" />
                 </Form.Item>
                 <Form.Item name="description" label="Tavsif">
-                    <Input.TextArea rows={3} placeholder="Zamonaviy web ilovalar..." />
+                    <Input.TextArea rows={3} placeholder="Professional huquqiy xizmatlar..." />
                 </Form.Item>
                 <Form.Item name="icon" label="Icon (emoji)">
                     <Input placeholder="🌐" />
                 </Form.Item>
-                <Form.Item name="image" label="Rasm URL">
-                    <Input placeholder="https://..." />
-                </Form.Item>
+
+                {/* Rasm yuklash — faqat tahrirlashda */}
+                {editingService && (
+                    <Form.Item label="Rasm">
+                        <div className="space-y-2">
+                            {getImageUrl(editingService.image) && (
+                                <div className="relative">
+                                    <img src={getImageUrl(editingService.image)} alt="Preview" style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 8 }} />
+                                    <Button
+                                        danger size="small" icon={<DeleteOutlined />}
+                                        onClick={() => deleteImageMutation.mutate(editingService.id)}
+                                        loading={deleteImageMutation.isPending}
+                                        style={{ position: 'absolute', top: 8, right: 8 }}
+                                    />
+                                </div>
+                            )}
+                            <Upload
+                                showUploadList={false}
+                                accept="image/*"
+                                beforeUpload={(file) => {
+                                    uploadImageMutation.mutate({ id: editingService.id, file })
+                                    return false
+                                }}
+                            >
+                                <Button icon={<UploadOutlined />} loading={uploadImageMutation.isPending}>
+                                    Rasm yuklash
+                                </Button>
+                            </Upload>
+                        </div>
+                    </Form.Item>
+                )}
+
                 <Form.Item name="categoryId" label="Kategoriya">
                     <Select placeholder="Tanlang" allowClear>
                         {categoriesData?.data?.map(cat => (
@@ -301,10 +360,10 @@ const ServicesPage = () => {
                 width={380}
             >
                 <Form.Item name="title" label="Nomi" rules={[{ required: true }]}>
-                    <Input placeholder="Responsive dizayn" />
+                    <Input placeholder="Shartnomalar tayyorlash" />
                 </Form.Item>
                 <Form.Item name="description" label="Tavsif">
-                    <Input.TextArea rows={2} placeholder="Barcha qurilmalarda ishlaydi" />
+                    <Input.TextArea rows={2} placeholder="Professional shartnomalar" />
                 </Form.Item>
                 <Form.Item name="icon" label="Icon (emoji)">
                     <Input placeholder="📱" />

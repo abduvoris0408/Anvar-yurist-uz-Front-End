@@ -26,4 +26,18 @@ export const testimonialsApi = {
         const { data } = await api.delete(`/testimonials/${id}`)
         return data
     },
+
+    uploadImage: async (id: string, file: File): Promise<ApiResponse<Testimonial>> => {
+        const formData = new FormData()
+        formData.append('image', file)
+        const { data } = await api.put(`/testimonials/${id}/image`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        })
+        return data
+    },
+
+    deleteImage: async (id: string): Promise<ApiResponse<null>> => {
+        const { data } = await api.delete(`/testimonials/${id}/image`)
+        return data
+    },
 }

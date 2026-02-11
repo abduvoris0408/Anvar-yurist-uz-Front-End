@@ -56,7 +56,7 @@ const PageHeader = ({
                             placeholder={searchPlaceholder}
                             allowClear
                             onSearch={onSearch}
-                            onChange={(e) => !e.target.value && onSearch('')}
+                            onChange={(e) => onSearch?.(e.target.value)}
                             prefix={<SearchOutlined style={{ color: 'var(--text-muted)' }} />}
                         />
                     </Col>

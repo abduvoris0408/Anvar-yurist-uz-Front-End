@@ -27,6 +27,20 @@ export const projectsApi = {
         return data
     },
 
+    uploadImage: async (id: string, file: File): Promise<ApiResponse<Project>> => {
+        const formData = new FormData()
+        formData.append('image', file)
+        const { data } = await api.put(`/projects/${id}/image`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        })
+        return data
+    },
+
+    deleteImage: async (id: string): Promise<ApiResponse<null>> => {
+        const { data } = await api.delete(`/projects/${id}/image`)
+        return data
+    },
+
     uploadGallery: async (id: string, formData: FormData): Promise<ApiResponse<Project>> => {
         const { data } = await api.put(`/projects/${id}/gallery`, formData, {
             headers: { 'Content-Type': 'multipart/form-data' },

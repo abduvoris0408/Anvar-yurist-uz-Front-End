@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Table, Form, Input, Select, Switch, Space, Tag, message, Card, Button, Popconfirm } from 'antd'
-import { EditOutlined, DeleteOutlined, PlusOutlined, StarOutlined, EyeOutlined } from '@ant-design/icons'
+import { Table, Form, Input, Select, Switch, Space, Tag, message, Card, Button, Popconfirm, Upload } from 'antd'
+import { EditOutlined, DeleteOutlined, PlusOutlined, StarOutlined, EyeOutlined, UploadOutlined } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { blogApi, categoriesApi, tagsApi } from '../api'
 import { PageHeader, CrudDrawer } from '../components'
@@ -75,11 +75,48 @@ const BlogPostsPage = () => {
         },
     })
 
+    const uploadImageMutation = useMutation({
+        mutationFn: ({ id, file }: { id: string; file: File }) => blogApi.uploadImage(id, file),
+        onSuccess: (response: any) => {
+            message.success('Rasm yuklandi!')
+            queryClient.invalidateQueries({ queryKey: ['blog-posts'] })
+            setEditingPost(prev => prev ? { ...prev, image: response.data?.image } as any : prev)
+        },
+        onError: () => message.error('Rasm yuklashda xatolik'),
+    })
+
+    const deleteImageMutation = useMutation({
+        mutationFn: (id: string) => blogApi.deleteImage(id),
+        onSuccess: () => {
+            message.success("Rasm o'chirildi!")
+            queryClient.invalidateQueries({ queryKey: ['blog-posts'] })
+            setEditingPost(prev => prev ? { ...prev, image: undefined } as any : prev)
+        },
+        onError: () => message.error("Rasm o'chirishda xatolik"),
+    })
+
+    const resetRatingMutation = useMutation({
+        mutationFn: (id: string) => blogApi.deleteRatings(id),
+        onSuccess: () => {
+            message.success("Reytinglar tozalandi!")
+            queryClient.invalidateQueries({ queryKey: ['blog-posts'] })
+        },
+        onError: () => message.error('Xatolik yuz berdi'),
+    })
+
+    const getImageUrl = (img: any): string | undefined => {
+        if (!img) return undefined
+        if (typeof img === 'string') return img
+        if (typeof img === 'object' && img.url) return img.url
+        return undefined
+    }
+
     const handleSubmit = (values: Record<string, unknown>) => {
+        const { image, ...rest } = values
         if (editingPost) {
-            updateMutation.mutate({ id: editingPost.id, values })
+            updateMutation.mutate({ id: editingPost.id, values: rest })
         } else {
-            createMutation.mutate(values)
+            createMutation.mutate(rest)
         }
     }
 
@@ -104,15 +141,6 @@ const BlogPostsPage = () => {
         draft: 'Qoralama',
         archived: 'Arxiv',
     }
-
-    const resetRatingMutation = useMutation({
-        mutationFn: (id: string) => blogApi.deleteRatings(id),
-        onSuccess: () => {
-            message.success("Reytinglar tozalandi!")
-            queryClient.invalidateQueries({ queryKey: ['blog-posts'] })
-        },
-        onError: () => message.error('Xatolik yuz berdi'),
-    })
 
     const columns = [
         {
@@ -233,7 +261,7 @@ const BlogPostsPage = () => {
                 width={520}
             >
                 <Form.Item name="title" label="Sarlavha" rules={[{ required: true }]}>
-                    <Input placeholder="Node.js Bilan REST API Yaratish" />
+                    <Input placeholder="Fuqarolik ishlarida himoya" />
                 </Form.Item>
                 <Form.Item name="excerpt" label="Qisqa tavsif">
                     <TextArea rows={2} placeholder="Bu maqolada..." />
@@ -241,9 +269,38 @@ const BlogPostsPage = () => {
                 <Form.Item name="content" label="Content (HTML)">
                     <TextArea rows={8} placeholder="<h2>Kirish</h2><p>Bu maqolada...</p>" />
                 </Form.Item>
-                <Form.Item name="image" label="Cover rasm URL">
-                    <Input placeholder="https://..." />
-                </Form.Item>
+
+                {/* Rasm yuklash — faqat tahrirlashda */}
+                {editingPost && (
+                    <Form.Item label="Cover rasm">
+                        <div className="space-y-2">
+                            {getImageUrl(editingPost.image) && (
+                                <div className="relative">
+                                    <img src={getImageUrl(editingPost.image)} alt="Preview" style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 8 }} />
+                                    <Button
+                                        danger size="small" icon={<DeleteOutlined />}
+                                        onClick={() => deleteImageMutation.mutate(editingPost.id)}
+                                        loading={deleteImageMutation.isPending}
+                                        style={{ position: 'absolute', top: 8, right: 8 }}
+                                    />
+                                </div>
+                            )}
+                            <Upload
+                                showUploadList={false}
+                                accept="image/*"
+                                beforeUpload={(file) => {
+                                    uploadImageMutation.mutate({ id: editingPost.id, file })
+                                    return false
+                                }}
+                            >
+                                <Button icon={<UploadOutlined />} loading={uploadImageMutation.isPending}>
+                                    Rasm yuklash
+                                </Button>
+                            </Upload>
+                        </div>
+                    </Form.Item>
+                )}
+
                 <Form.Item name="categoryId" label="Kategoriya">
                     <Select placeholder="Tanlang" allowClear>
                         {categoriesData?.data?.map(cat => (

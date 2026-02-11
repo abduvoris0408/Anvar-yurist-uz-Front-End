@@ -28,6 +28,20 @@ export const servicesApi = {
         return data
     },
 
+    uploadImage: async (id: string, file: File): Promise<ApiResponse<Service>> => {
+        const formData = new FormData()
+        formData.append('image', file)
+        const { data } = await api.put(`/services/${id}/image`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        })
+        return data
+    },
+
+    deleteImage: async (id: string): Promise<ApiResponse<null>> => {
+        const { data } = await api.delete(`/services/${id}/image`)
+        return data
+    },
+
     // Service Details CRUD
     getAllDetails: async (params?: Record<string, unknown>): Promise<ApiResponse<ServiceDetail[]>> => {
         const { data } = await api.get('/service-details', { params })

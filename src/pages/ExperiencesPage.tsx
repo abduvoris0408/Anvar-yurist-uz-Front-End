@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
-import { Table, Form, Input, DatePicker, Switch, Tag, message, Space } from 'antd'
+import { Table, Form, Input, DatePicker, Switch, Tag, message, Space, Upload, Button } from 'antd'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { UploadOutlined, DeleteOutlined } from '@ant-design/icons'
 import { experiencesApi } from '../api'
 import { PageHeader, CrudDrawer, ActionButtons } from '../components'
 import type { Experience } from '../types'
@@ -63,6 +64,33 @@ const ExperiencesPage = () => {
         onError: () => message.error('Xatolik yuz berdi'),
     })
 
+    const uploadLogoMutation = useMutation({
+        mutationFn: ({ id, file }: { id: string; file: File }) => experiencesApi.uploadLogo(id, file),
+        onSuccess: (response: any) => {
+            message.success('Logo yuklandi!')
+            queryClient.invalidateQueries({ queryKey: ['experiences'] })
+            setEditingExperience(prev => prev ? { ...prev, companyLogo: response.data?.companyLogo } as any : prev)
+        },
+        onError: () => message.error('Logo yuklashda xatolik'),
+    })
+
+    const deleteLogoMutation = useMutation({
+        mutationFn: (id: string) => experiencesApi.deleteLogo(id),
+        onSuccess: () => {
+            message.success("Logo o'chirildi!")
+            queryClient.invalidateQueries({ queryKey: ['experiences'] })
+            setEditingExperience(prev => prev ? { ...prev, companyLogo: undefined } as any : prev)
+        },
+        onError: () => message.error("Logo o'chirishda xatolik"),
+    })
+
+    const getImageUrl = (img: any): string | undefined => {
+        if (!img) return undefined
+        if (typeof img === 'string') return img
+        if (typeof img === 'object' && img.url) return img.url
+        return undefined
+    }
+
     const handleOpenDrawer = (experience?: Experience) => {
         if (experience) {
             setEditingExperience(experience)
@@ -70,7 +98,6 @@ const ExperiencesPage = () => {
                 ...experience,
                 startDate: experience.startDate ? dayjs(experience.startDate) : null,
                 endDate: experience.endDate ? dayjs(experience.endDate) : null,
-                // technologies: experience.technologies?.join(', '), // Removed
             })
         } else {
             setEditingExperience(null)
@@ -86,13 +113,14 @@ const ExperiencesPage = () => {
     }
 
     const handleSubmit = async (values: Record<string, unknown>) => {
+        const { companyLogo, ...rest } = values
         const data = {
-            ...values,
-            startDate: values.startDate ? (values.startDate as dayjs.Dayjs).format('YYYY-MM-DD') : undefined,
-            endDate: values.current ? null : (values.endDate ? (values.endDate as dayjs.Dayjs).format('YYYY-MM-DD') : undefined),
-            specializations: typeof values.specializations === 'string'
-                ? (values.specializations as string).split(',').map((t: string) => t.trim()).filter(Boolean)
-                : values.specializations,
+            ...rest,
+            startDate: rest.startDate ? (rest.startDate as dayjs.Dayjs).format('YYYY-MM-DD') : undefined,
+            endDate: rest.current ? null : (rest.endDate ? (rest.endDate as dayjs.Dayjs).format('YYYY-MM-DD') : undefined),
+            specializations: typeof rest.specializations === 'string'
+                ? (rest.specializations as string).split(',').map((t: string) => t.trim()).filter(Boolean)
+                : rest.specializations,
         } as Partial<Experience>
 
         if (editingExperience) {
@@ -103,6 +131,16 @@ const ExperiencesPage = () => {
     }
 
     const columns: ColumnsType<Experience> = [
+        {
+            title: 'Logo',
+            dataIndex: 'companyLogo',
+            key: 'companyLogo',
+            width: 50,
+            render: (logo) => {
+                const url = getImageUrl(logo)
+                return url ? <img src={url} alt="" style={{ width: 32, height: 32, objectFit: 'contain', borderRadius: 4 }} /> : '-'
+            },
+        },
         {
             title: 'Kompaniya',
             dataIndex: 'company',
@@ -173,10 +211,10 @@ const ExperiencesPage = () => {
                 width={450}
             >
                 <Form.Item name="company" label="Kompaniya" rules={[{ required: true }]}>
-                    <Input placeholder="Google" />
+                    <Input placeholder="Yuridik firma" />
                 </Form.Item>
                 <Form.Item name="position" label="Lavozim" rules={[{ required: true }]}>
-                    <Input placeholder="Senior Developer" />
+                    <Input placeholder="Bosh yurist" />
                 </Form.Item>
                 <Form.Item name="location" label="Joylashuv">
                     <Input placeholder="San Francisco, CA" />
@@ -184,6 +222,38 @@ const ExperiencesPage = () => {
                 <Form.Item name="description" label="Tavsif">
                     <TextArea rows={3} placeholder="Ish haqida ma'lumot" />
                 </Form.Item>
+
+                {/* Logo yuklash — faqat tahrirlashda */}
+                {editingExperience && (
+                    <Form.Item label="Kompaniya logosi">
+                        <div className="space-y-2">
+                            {getImageUrl(editingExperience.companyLogo) && (
+                                <div className="relative inline-block">
+                                    <img src={getImageUrl(editingExperience.companyLogo)} alt="Logo" style={{ width: 64, height: 64, objectFit: 'contain', borderRadius: 8, border: '1px solid #eee' }} />
+                                    <Button
+                                        danger size="small" icon={<DeleteOutlined />}
+                                        onClick={() => deleteLogoMutation.mutate(editingExperience.id)}
+                                        loading={deleteLogoMutation.isPending}
+                                        style={{ position: 'absolute', top: -8, right: -8 }}
+                                    />
+                                </div>
+                            )}
+                            <Upload
+                                showUploadList={false}
+                                accept="image/*"
+                                beforeUpload={(file) => {
+                                    uploadLogoMutation.mutate({ id: editingExperience.id, file })
+                                    return false
+                                }}
+                            >
+                                <Button icon={<UploadOutlined />} loading={uploadLogoMutation.isPending}>
+                                    Logo yuklash
+                                </Button>
+                            </Upload>
+                        </div>
+                    </Form.Item>
+                )}
+
                 <Space className="w-full" size="middle">
                     <Form.Item name="startDate" label="Boshlanish" rules={[{ required: true }]}>
                         <DatePicker className="w-full" format="YYYY-MM-DD" />
@@ -199,7 +269,7 @@ const ExperiencesPage = () => {
                     <Input placeholder="Korporativ huquq, Mehnat huquqi" />
                 </Form.Item>
                 <Form.Item name="companyUrl" label="Kompaniya URL">
-                    <Input placeholder="https://google.com" />
+                    <Input placeholder="https://firma.uz" />
                 </Form.Item>
             </CrudDrawer>
         </>

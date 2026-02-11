@@ -26,4 +26,18 @@ export const categoriesApi = {
         const { data } = await api.delete(`/categories/${id}`)
         return data
     },
+
+    uploadImage: async (id: string, file: File): Promise<ApiResponse<Category>> => {
+        const formData = new FormData()
+        formData.append('image', file)
+        const { data } = await api.put(`/categories/${id}/image`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        })
+        return data
+    },
+
+    deleteImage: async (id: string): Promise<ApiResponse<null>> => {
+        const { data } = await api.delete(`/categories/${id}/image`)
+        return data
+    },
 }
