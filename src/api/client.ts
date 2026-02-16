@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const API_URL = 'http://localhost:5001/api/v1'
+const API_URL = 'https://portfolio-backend-rh0y.onrender.com/api/v1'
 
 const api = axios.create({
     baseURL: API_URL,
@@ -48,7 +48,9 @@ api.interceptors.response.use(
         const originalRequest = error.config
 
         // 401 — token muddati tugagan
-        if (error.response?.status === 401 && !originalRequest._retry) {
+        // Login va refresh-token endpointlarini interceptordan chiqarish
+        const isAuthEndpoint = originalRequest.url?.includes('/auth/login') || originalRequest.url?.includes('/auth/refresh-token')
+        if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
             if (isRefreshing) {
                 return new Promise((resolve, reject) => {
                     failedQueue.push({ resolve, reject })
