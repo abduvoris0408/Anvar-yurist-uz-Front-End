@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Table, Form, Input, ColorPicker, Tag, message, Upload, Button } from 'antd'
+import { Table, Form, Input, ColorPicker, Tag, message, Upload, Button, Select } from 'antd'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { UploadOutlined, DeleteOutlined } from '@ant-design/icons'
 import { categoriesApi } from '../api'
@@ -149,6 +149,21 @@ const CategoriesPage = () => {
             key: 'slug',
         },
         {
+            title: 'Turi',
+            dataIndex: 'type',
+            key: 'type',
+            render: (type: string) => {
+                const typeColors: Record<string, string> = {
+                    project: 'blue',
+                    blog: 'green',
+                    service: 'purple',
+                    skill: 'orange',
+                    news: 'cyan',
+                }
+                return <Tag color={typeColors[type] || 'default'}>{type}</Tag>
+            },
+        },
+        {
             title: 'Amallar',
             key: 'actions',
             width: 100,
@@ -195,6 +210,19 @@ const CategoriesPage = () => {
                     rules={[{ required: true, message: 'Nomini kiriting' }]}
                 >
                     <Input placeholder="Huquq sohasi" />
+                </Form.Item>
+                <Form.Item
+                    name="type"
+                    label="Turi"
+                    rules={[{ required: true, message: 'Turini tanlang' }]}
+                >
+                    <Select placeholder="Kategoriya turini tanlang">
+                        <Select.Option value="project">Loyiha (project)</Select.Option>
+                        <Select.Option value="blog">Blog (blog)</Select.Option>
+                        <Select.Option value="service">Xizmat (service)</Select.Option>
+                        <Select.Option value="skill">Ko'nikma (skill)</Select.Option>
+                        <Select.Option value="news">Yangilik (news)</Select.Option>
+                    </Select>
                 </Form.Item>
                 <Form.Item name="description" label="Tavsif">
                     <Input.TextArea rows={2} placeholder="Kategoriya tavsifi" />
