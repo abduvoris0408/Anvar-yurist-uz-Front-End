@@ -15,6 +15,9 @@ const NewsPage = () => {
     const [drawerOpen, setDrawerOpen] = useState(false)
     const [editingNews, setEditingNews] = useState<News | null>(null)
 
+    const [selectedFile, setSelectedFile] = useState<File | null>(null)
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+
     const { data: newsData, isLoading } = useQuery({
         queryKey: ['news'],
         queryFn: () => newsApi.getAll(),
@@ -30,13 +33,48 @@ const NewsPage = () => {
         queryFn: () => tagsApi.getAll(),
     })
 
+    const uploadImageMutation = useMutation({
+        mutationFn: ({ id, file }: { id: string; file: File }) => newsApi.uploadImage(id, file),
+        onSuccess: (response: any) => {
+            message.success('Rasm yuklandi!')
+            queryClient.invalidateQueries({ queryKey: ['news'] })
+            if (editingNews) {
+                setEditingNews(prev => prev ? { ...prev, image: response.data?.image } as any : prev)
+            }
+        },
+        onError: () => message.error('Rasm yuklashda xatolik'),
+    })
+
     const createMutation = useMutation({
         mutationFn: (values: Partial<News>) => newsApi.create(values),
-        onSuccess: () => {
+        onSuccess: (res) => {
             message.success('Yangilik yaratildi!')
-            queryClient.invalidateQueries({ queryKey: ['news'] })
-            setDrawerOpen(false)
-            form.resetFields()
+
+            if (selectedFile && res.data?.id) {
+                uploadImageMutation.mutate(
+                    { id: res.data.id, file: selectedFile },
+                    {
+                        onSuccess: () => {
+                            queryClient.invalidateQueries({ queryKey: ['news'] })
+                            setDrawerOpen(false)
+                            form.resetFields()
+                            setSelectedFile(null)
+                            setPreviewUrl(null)
+                        },
+                        onError: () => {
+                            message.warning('Yangilik yaratildi, lekin rasm yuklanmadi')
+                            setDrawerOpen(false)
+                            form.resetFields()
+                            setSelectedFile(null)
+                            setPreviewUrl(null)
+                        }
+                    }
+                )
+            } else {
+                queryClient.invalidateQueries({ queryKey: ['news'] })
+                setDrawerOpen(false)
+                form.resetFields()
+            }
         },
         onError: (error: any) => {
             console.error('Create News Error:', error)
@@ -74,16 +112,6 @@ const NewsPage = () => {
         },
     })
 
-    const uploadImageMutation = useMutation({
-        mutationFn: ({ id, file }: { id: string; file: File }) => newsApi.uploadImage(id, file),
-        onSuccess: (response: any) => {
-            message.success('Rasm yuklandi!')
-            queryClient.invalidateQueries({ queryKey: ['news'] })
-            setEditingNews(prev => prev ? { ...prev, image: response.data?.image } as any : prev)
-        },
-        onError: () => message.error('Rasm yuklashda xatolik'),
-    })
-
     const deleteImageMutation = useMutation({
         mutationFn: (id: string) => newsApi.deleteImage(id),
         onSuccess: () => {
@@ -112,6 +140,8 @@ const NewsPage = () => {
 
     const handleEdit = (record: News) => {
         setEditingNews(record)
+        setSelectedFile(null)
+        setPreviewUrl(null)
         form.setFieldsValue({
             ...record,
             categoryId: record.categoryId || record.category?.id,
@@ -183,7 +213,13 @@ const NewsPage = () => {
                 title="Yangiliklar"
                 subtitle="Yangiliklarni boshqarish"
                 extra={
-                    <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditingNews(null); form.resetFields(); setDrawerOpen(true) }}>
+                    <Button type="primary" icon={<PlusOutlined />} onClick={() => {
+                        setEditingNews(null);
+                        form.resetFields();
+                        setSelectedFile(null);
+                        setPreviewUrl(null);
+                        setDrawerOpen(true);
+                    }}>
                         Yangi yangilik
                     </Button>
                 }
@@ -201,11 +237,17 @@ const NewsPage = () => {
 
             <CrudDrawer
                 open={drawerOpen}
-                onClose={() => { setDrawerOpen(false); setEditingNews(null); form.resetFields() }}
+                onClose={() => {
+                    setDrawerOpen(false);
+                    setEditingNews(null);
+                    form.resetFields();
+                    setSelectedFile(null);
+                    setPreviewUrl(null);
+                }}
                 title={editingNews ? 'Yangilikni yangilash' : 'Yangi yangilik'}
                 form={form}
                 onSubmit={handleSubmit}
-                loading={createMutation.isPending || updateMutation.isPending}
+                loading={createMutation.isPending || updateMutation.isPending || (createMutation.isSuccess && uploadImageMutation.isPending)}
                 isEdit={!!editingNews}
                 width={520}
             >
@@ -219,36 +261,59 @@ const NewsPage = () => {
                     <TextArea rows={6} placeholder="<p>Maqola matni...</p>" />
                 </Form.Item>
 
-                {/* Rasm yuklash — faqat tahrirlashda */}
-                {editingNews && (
-                    <Form.Item label="Rasm">
-                        <div className="space-y-2">
-                            {getImageUrl(editingNews.image) && (
-                                <div className="relative">
-                                    <img src={getImageUrl(editingNews.image)} alt="Preview" style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 8 }} />
-                                    <Button
-                                        danger size="small" icon={<DeleteOutlined />}
-                                        onClick={() => deleteImageMutation.mutate(editingNews.id)}
-                                        loading={deleteImageMutation.isPending}
-                                        style={{ position: 'absolute', top: 8, right: 8 }}
-                                    />
-                                </div>
-                            )}
-                            <Upload
-                                showUploadList={false}
-                                accept="image/*"
-                                beforeUpload={(file) => {
+                {/* Rasm yuklash */}
+                <Form.Item label="Rasm">
+                    <div className="space-y-2">
+                        {/* Tahrirlash rejimi: mavjud rasmni ko'rsatish */}
+                        {editingNews && getImageUrl(editingNews.image) && (
+                            <div className="relative">
+                                <img src={getImageUrl(editingNews.image)} alt="Preview" style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 8 }} />
+                                <Button
+                                    danger size="small" icon={<DeleteOutlined />}
+                                    onClick={() => deleteImageMutation.mutate(editingNews.id)}
+                                    loading={deleteImageMutation.isPending}
+                                    style={{ position: 'absolute', top: 8, right: 8 }}
+                                />
+                            </div>
+                        )}
+
+                        {/* Yaratish rejimi: tanlangan rasmni ko'rsatish */}
+                        {!editingNews && previewUrl && (
+                            <div className="relative">
+                                <img src={previewUrl} alt="Selected Preview" style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 8 }} />
+                                <Button
+                                    danger size="small" icon={<DeleteOutlined />}
+                                    onClick={() => {
+                                        setSelectedFile(null);
+                                        setPreviewUrl(null);
+                                    }}
+                                    style={{ position: 'absolute', top: 8, right: 8 }}
+                                />
+                            </div>
+                        )}
+
+                        <Upload
+                            showUploadList={false}
+                            accept="image/*"
+                            beforeUpload={(file) => {
+                                if (editingNews) {
+                                    // Tahrirlashda darhol yuklash (eski logika)
                                     uploadImageMutation.mutate({ id: editingNews.id, file })
-                                    return false
-                                }}
-                            >
-                                <Button icon={<UploadOutlined />} loading={uploadImageMutation.isPending}>
-                                    Rasm yuklash
-                                </Button>
-                            </Upload>
-                        </div>
-                    </Form.Item>
-                )}
+                                } else {
+                                    // Yaratishda faqat state ga saqlash
+                                    setSelectedFile(file)
+                                    setPreviewUrl(URL.createObjectURL(file))
+                                }
+                                return false
+                            }}
+                        >
+                            <Button icon={<UploadOutlined />} loading={uploadImageMutation.isPending}>
+                                {editingNews ? 'Rasm yuklash' : (selectedFile ? 'Rasmni o\'zgartirish' : 'Rasm tanlash')}
+                            </Button>
+                        </Upload>
+                        {!editingNews && selectedFile && <div className="text-xs text-gray-500">Rasm yangilik yaratilgandan so'ng yuklanadi.</div>}
+                    </div>
+                </Form.Item>
 
                 <Form.Item name="categoryId" label="Kategoriya">
                     <Select placeholder="Tanlang" allowClear>
